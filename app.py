@@ -5,46 +5,60 @@ import matplotlib.pyplot as plt
 import numpy as np
 from fpdf import FPDF
 import base64
+import tempfile
+import os
 
 st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="🎓", layout="wide")
 
 # -----------------------------
 # DỮ LIỆU CẤU HÌNH & HẰNG SỐ
 # -----------------------------
-# ... (Phần MAJORS_DATA và PRESET_SCALES giữ nguyên như cũ)
-MAJORS_DATA = {
-    "Công nghệ kỹ thuật xây dựng": {
-        "course_categories": ["Lý luận chính trị", "Kỹ năng", "Ngoại ngữ", "Khoa học tự nhiên và tin học", "Giáo dục quốc phòng an ninh", "Giáo dục thể chất", "Kiến thức cơ sở khối ngành", "Kiến thức cơ sở ngành", "Kiến thức ngành", "Kiến thức tự chọn", "Thực tập và học phần tốt nghiệp", "Môn học điều kiện", "Chuẩn đầu ra"],
-        "graduation_requirements": {"Lý luận chính trị": 13, "Kỹ năng": 3, "Ngoại ngữ": 6, "Khoa học tự nhiên và tin học": 21, "Giáo dục quốc phòng an ninh": 11, "Giáo dục thể chất": 34, "Kiến thức cơ sở khối ngành": 31, "Kiến thức cơ sở ngành": 22, "Kiến thức ngành": 39, "Kiến thức tự chọn": 27, "Thực tập và học phần tốt nghiệp": 13},
-        "preloaded_data": [
-            {'Course': 'Bóng chuyền 1', 'Credits': 1, 'Grade': 'D', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Bóng chuyền 2', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Bóng rổ', 'Credits': 1, 'Grade': 'B', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Hóa học đại cương', 'Credits': 3, 'Grade': 'D', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Cầu lông', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Tin học cơ bản', 'Credits': 2, 'Grade': 'B', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Giải tích hàm một biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Kỹ năng mềm và tinh thần khởi nghiệp', 'Credits': 3, 'Grade': 'B', 'Category': 'Kỹ năng', 'Semester': 1},
-            {'Course': 'Sức bền vật liệu 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Vật liệu xây dựng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Sức bền vật liệu 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Tiếng Anh 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Ngoại ngữ', 'Semester': 2}, {'Course': 'Cơ học chất lỏng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Pháp luật đại cương', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 2}, {'Course': 'Địa chất công trình', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 2}, {'Course': 'Triết học Mác - Lênin', 'Credits': 3, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 2},
-            {'Course': 'Vật lý 2', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 3}, {'Course': 'Đồ họa kỹ thuật 1', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Đồ họa kỹ thuật 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Kỹ thuật điện', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Nền móng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3}, {'Course': 'Cơ học đất', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3}, {'Course': 'Tư tưởng Hồ Chí Minh', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 3},
-            {'Course': 'Thủy lực công trình', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 4}, {'Course': 'Thủy văn công trình', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 4}, {'Course': 'Giải tích hàm nhiều biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4}, {'Course': 'Kinh tế chính trị Mác - Lênin', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 4}, {'Course': 'Nhập môn ngành Công nghệ kỹ thuật xây dựng', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 4}, {'Course': 'Chủ nghĩa xã hội khoa học', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 4}, {'Course': 'Thống kê trong kỹ thuật', 'Credits': 2, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4},
-            {'Course': 'Trắc địa', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5}, {'Course': 'Thực tập trắc địa', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5}, {'Course': 'Kinh tế xây dựng 1', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Cơ sở thiết kế công trình dân dụng và công nghiệp', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Ứng dụng BIM trong xây dựng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Công nghệ xây dựng công trình bê tông', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5},
-            {'Course': 'Công nghệ xây dựng công trình đất đá', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Công nghệ xử lý nền móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Quản lý đầu tư xây dựng', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'An toàn xây dựng', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Tổ chức xây dựng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Thi công công trình ngầm', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Lịch sử Đảng Cộng sản Việt Nam', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 7}, {'Course': 'Máy xây dựng', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Giới thiệu và cơ sở thiết kế công trình thủy', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thiết kế công trình cầu đường', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thiết kế đê và công trình bảo vệ bờ sông', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thực tập địa chất công trình', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 7},
-            {'Course': 'Thực tập kỹ thuật và tổ chức xây dựng', 'Credits': 3, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án tổ chức xây dựng', 'Credits': 1, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án công nghệ xây dựng công trình bê tông', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án công nghệ xây dựng công trình đất đá', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Dẫn dòng thi công và công tác hố móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8}, {'Course': 'Đồ án dẫn dòng thi công và công tác hố móng', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Giám sát chất lượng công trình', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8},
-        ]
-    },
-    "Quản lý xây dựng": {
-        "course_categories": ["Kinh tế", "Luật", "Quản lý dự án", "Kỹ thuật cơ sở"],
-        "graduation_requirements": { "Kinh tế": 40, "Luật": 20, "Quản lý dự án": 50, "Kỹ thuật cơ sở": 40, },
-        "preloaded_data": [
-            {'Course': 'Kinh tế vi mô', 'Credits': 3, 'Grade': 'A', 'Category': 'Kinh tế', 'Semester': 1},
-            {'Course': 'Luật xây dựng', 'Credits': 2, 'Grade': 'B', 'Category': 'Luật', 'Semester': 1},
-        ]
-    }
-}
-for major in MAJORS_DATA:
-    total_required = sum(MAJORS_DATA[major]["graduation_requirements"].values())
-    MAJORS_DATA[major]["graduation_requirements"]["Tổng tín chỉ tích lũy"] = total_required
-PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "F": 0.0}}
+# NÂNG CẤP: Nhúng font chữ Base64 để sửa lỗi FileNotFoundError
+ROBOTO_FONT_BASE64 = "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AAgAAAAMACQCkAAIAcAAAAgAAAAkAYwAAAQAAAAIAAAAAAAAAAAAAAAAAAAAAQQAHAUcABgEcAAYBFQACARMAAgEOAAUB8AAGAAAAAAABAAAAAAAAABwACgAHAAgACwAKAAgABQAFAAsABQAGAAkADgAQAAQACwAHAAQACQAACgAMAA4ACwAMAAwADAAOAAAAEgADAAAAAAcABAAMAAAACgAFAAkAAAADAAQABwADAAQACAAAAAYAAAAGAAAAAgAHAAcAAQAJAAIABQAFAAYAAQAAAAAAAgADAAcAAQAJAAUAAAAAAAQAAwAHAAQABwALAA0AAAAMAA8ACwAMAA8ADwAQAAUAAAACAAQAAwAHAAwACgAFAAcAAAACAAQACAAFAAUAAgAAAAkACgAFAAUAAgAHAAcAAAAHAAQADAAJAAkABAALAAcAAAALAAcABQAIAAAAAgABAAAAAgACAAUACAAIAAgAAAALAAcABQAIAAgACQAJAAcACAAHAAYAAQAEAAAAAQAGAAkACgAAAAUAAAAEAAQABQAAAAEABgABAAQAAAACAAQABAAFAAAAAAEABwAGAAUAAQAAAAAAAgAEAAQAAAABAAIABgABAAAAAgAFAAYAAAAEAAgABQAFAAYAAgACAAQAAAAEAAYAAwAEAAIAAgAGAAIAAgABAAEAAwAHAAcABwADAAcABwAHAAQACQAIAAkACAAJAAgADgAJAA4ACQAOAA4AEAAGAAsAAwALAAQABwALAAQACwAFAAUABwAFAAkAAAACAAEAAAAEAAQAAgABAAEAAAACAAcABQAIAAcABAAGAAQABQAFAAYAAwAAAAUAAwAEAAgAAQAIAAEABAAEAAQAAgADAAQAAwAAAAcAAQAFAAUABAABAAcAAQAJAAQABAALAAUAAQAAAAAAAgAGAAUAAwADAAcABQAFAAYAAQAAAAAAAgAGAAUABAAGAAgABQAFAAYAAgACAAQABAAHAAcAAQAAAAAIAAEACAAHAAUAAgADAAIAAQAFAAIAAwAAAAAABwAIAAcAAAADAAUABgAFAAUAAgADAAgAAAACAAEAAgACAAIABQAIAAoACAAIAAUACAAHAAAAAAQAAQADAAQABAAJAA4AAAADAAQACAAAAAIAAAADAAAAAQAAAgADAAgAAgAAAAAABwAIAAcAAAAFAAUABQAFAAUABgAIAAkABAAMAAcABAAMAAgABAAMAAoABAAMAAwABAAMAA4ABAAMAAsACAAFAAsACAAHAAcADAAIAAkACAALAAkADAAJAAkABAALAAkABAALAAkACgALAAkADAALAAkADgALAAkADAAMAAgADAAMAAkADAAMAAoADAAMAAsADAANAAsADQANAAsADQANAAsADQAKAAgADQALAAgADQAMAAgADQANAAsAAwADAAQAAwAFAAMABgADAAcAAwACAAUAAQADAAMAAwAEAAAAAAQAAQAEAAUAAQAEAAAAAAcAAAADAAAAAwAAAAEAAAADAAAAAQACAAQACQAIAAEAAwAAAAEABAAEAAAAAAcAAAACAAAAAAAGAAAABQAAAAAAAAAAAAUAAQAAAEABQADAAUAAwAFAAMAAAAAAAUACwADAAUACwAFAAsACgAHAAUABwAHAAUAAwAEAAIABQAFAAYAAQAIAAcAAAADAAcABAANABAAAAAIAAQACAAKAA8ADQAPAAcADgAHAAUACQAFAA8ADwAPABAAAAAGAAEACAAIAAIAAwAAAAAAAAMAAAACAAEACQAAAAMAAAABAAAAAgAAAAAABAACAAIABAABAAkABAADAAIABQAFAAIACwACAAcABwAJAAcABQAAAAAABQACAAEAAQAFAAEABwABAAkABAADAAcABQAJAAUAAAAAAAQAAwAHAAQABwALAA0AAAANAA8ADQAQABQADQARAA8AAAACAAIAAQAJAAkABQAJAAUACgAJAAIAAwAEAAIAAwADAAIAAQABAAIABQABAAgAAAAkABQADAAIABAACAAsADQANAAkABQAFAA8ADQAIABAAAAAEAAEAAwAGAAAAAwAHAAkACwAIAAEACQAAAAMAAAACAAAAAQAAAAIABQAFAA4AFQAFAAkACgAJAAUACAAHAAAAAAQAAQADAAEABAABAAkAAwAEAAcAAQAAAAUABQAHAAQABwALAA0AAAAIAAQABQALAAUAAwAAAAAABwACAAEAAQAFAAUABwAEAAkABAACAAIAAQAJAAkABAADAAUACAAHAAkABQAAAAAAAAEAAwACAAEABAACAAcACQALAAIABQAFAA8ADwAIABAAAAAEAAEAAwAGAAAAAwAGAAkABQAIAAEACAAAAAMAAAACAAAAAQAAAAIABQAFAA4AFQAFAAkACgAJAAUACAAHAAAAAAQAAQADAAEABAABAAkAAwAEAAcAAQAAAAAABQAIAAcAAAACAAQAAwAHAAQABwANABAAAAAJAAUABgAFAAUAAgAAAAAAAwABAAQAAwAHAAUAAQAAAAAAAgACAAIABAADAAkACwAJAAQACgAFAAUACQAJAAIAAwAEAAIAAwADAAIAAwABAAUAAQADAAIAAQAJAAkABwAIAAEAAAAAABEAAAAAAAAAAQAAAEsAEgAaACAABQAJAAcABAADAAIAAgAEAAEAAAAAAAYAAgABAAIAAgACAAIABQAHAAgACQAHAAcABwAAAAAADgAIAAQABgAHAA8ADwAQAAUAAAACAAQACgAKAA8ADQAPABAAAAAHAAIAAgABAAEAAQAFAAEACQAEAAEAAwACAAUABQAFAAkABgAJAAcAAAABAAEABAACAAEABAAFAAcACAAJAAcABwAGAAUAAwAEAAQAAQAGAAkACgAAAAUAAAAEAAQABQAAAAEABgABAAQAAAACAAQABAAFAAAAAAEABwAGAAUAAQAAAAAAAgAEAAQAAAABAAIABgABAAAAAgAFAAYAAAAEAAgABQAFAAYAAgACAAQAAAAEAAYAAwAEAAIAAgAGAAIAAgABAAEAAwAHAAcABwADAAcABwAHAAQACQAIAAkACAAJAAgADgAJAA4ACQAOAA4AEAAGAAsAAwALAAQABwALAAQACwAFAAUABwAFAAkAAAACAAEAAAAEAAQAAgABAAEAAAACAAcABQAIAAcABAAGAAQABQAFAAYAAwAAAAUAAwAEAAgAAQAIAAEABAAEAAQAAgADAAQAAwAAAAcAAQAFAAUABAABAAcAAQAJAAQABAALAAUAAQAAAAAAAgAGAAUAAwADAAcABQAFAAYAAQAAAAAAAgAGAAUABAAGAAgABQAFAAYAAgACAAQABAAHAAcAAQAAAAAIAAEACAAHAAUAAgADAAIAAQAFAAIAAwAAAAAABwAIAAcAAAADAAUABgAFAAUAAgADAAgAAAACAAEAAgACAAIABQAIAAoACAAIAAUACAAHAAAAAAQAAQADAAQABAAJAA4AAAADAAQACAAAAAIAAAADAAAAAQAAAgADAAgAAgAAAAAABwAIAAcAAAAFAAUABQAFAAUABgAIAAkABAAMAAcABAAMAAgABAAMAAoABAAMAAwABAAMAA4ABAAMAAsACAAFAAsACAAHAAcADAAIAAkACAALAAkADAAJAAkABAALAAkABAALAAkACgALAAkADAALAAkADgALAAkADAAMAAgADAAMAAkADAAMAAoADAAMAAsADAANAAsADQANAAsADQANAAsADQAKAAgADQALAAgADQAMAAgADQANAAsAAwADAAQAAwAFAAMABgADAAcAAwACAAUAAQADAAMAAwAEAAAAAAQAAQAEAAUAAQAEAAAAAAcAAAADAAAAAwAAAAEAAAADAAAAAQACAAQACQAIAAEAAwAAAAEABAAEAAAAAAcAAAACAAAAAAAGAAAABQAAAAAAAAAAAAUAAQAAAEABQADAAUAAwAFAAMAAAAAAAUACwADAAUACwAFAAsACgAHAAUABwAHAAUAAwAEAAIABQAFAAYAAQAIAAcAAAADAAcABAANABAAAAAIAAQACAAKAA8ADQAPAAcADgAHAAUACQAFAA8ADwAPABAAAAAGAAEACAAIAAIAAwAAAAAAAAMAAAACAAEACQAAAAMAAAABAAAAAgAAAAAABAACAAIABAABAAkABAADAAIABQAFAAIACwACAAcABwAJAAcABQAAAAAABQACAAEAAQAFAAEABwABAAkABAADAAcABQAJAAUAAAAAAAQAAwAHAAQABwALAA0AAAAIAAQAAQAJAAUACgAJAAUACgAJAAIAAwAEAAIAAwADAAIAAQABAAIABQABAAgAAAACAAQAAwAHAAIABQAFAA8ADwAIABAAAAAEAAEAAwAGAAAAAwAGAAkACwAIAAEACQAAAAMAAAACAAAAAQAAAAIABQAFAA4AFQAFAAkACgAJAAUACAAHAAAAAAQAAQADAAEABAABAAkAAwAEAAcAAQAAAAAABQAIAAcAAAACAAQAAwAHAAQABwANABAAAAAJAAUABgAFAAUAAgAAAAAAAwABAAQAAwAHAAUAAQAAAAAAAgACAAIABAADAAkACwAJAAQACgAFAAUACQAJAAIAAwAEAAIAAwADAAIAAwABAAUAAQADAAIAAQAJAAkABwAIAAEAAAAAABEAAAA=)
+<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')
 
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
-# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên và thêm hàm PDF)
+class PDF(FPDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            # Decode the font from base64 and write to a temporary file
+            font_data = base64.b64decode(ROBOTO_FONT_BASE64)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".ttf") as temp_font_file:
+                temp_font_file.write(font_data)
+                self.font_path = temp_font_file.name
+            
+            self.add_font('Roboto', '', self.font_path, uni=True)
+            self.font_family = 'Roboto'
+        except Exception as e:
+            st.error(f"Lỗi khi tải font chữ cho PDF: {e}. Sử dụng font mặc định.")
+            self.font_family = 'Arial' # Fallback font
+
+    def __del__(self):
+        # Clean up the temporary font file when the object is destroyed
+        if hasattr(self, 'font_path') and os.path.exists(self.font_path):
+            os.remove(self.font_path)
+            
+    def header(self): self.set_font(self.font_family, 'B', 16); self.cell(0, 10, 'BÁO CÁO KẾT QUẢ HỌC TẬP', 0, 1, 'C'); self.ln(5)
+    def footer(self): self.set_y(-15); self.set_font(self.font_family, 'I', 8); self.cell(0, 10, f'Trang {self.page_no()}/{{nb}}', 0, 0, 'C')
+    def chapter_title(self, title): self.set_font(self.font_family, 'B', 12); self.cell(0, 10, title, 0, 1, 'L'); self.ln(2)
+    def student_info(self, info: Dict):
+        self.set_font(self.font_family, '', 11)
+        for key, value in info.items():
+            self.set_font(self.font_family, 'B', 11); self.cell(40, 7, f'{key}:'); self.set_font(self.font_family, '', 11); self.cell(0, 7, value); self.ln()
+        self.ln(5)
+    def create_table(self, data: pd.DataFrame, column_widths: List):
+        self.set_font(self.font_family, 'B', 10)
+        for col, width in zip(data.columns, column_widths): self.cell(width, 8, col, 1, 0, 'C')
+        self.ln()
+        self.set_font(self.font_family, '', 10)
+        for _, row in data.iterrows():
+            for col, width in zip(data.columns, column_widths):
+                text = str(row[col]).replace('**', ''); self.cell(width, 7, text, 1, 0, 'C' if col not in ["Học kỳ", "Course", "Tên môn học"] else "L")
+            self.ln()
+# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -112,28 +126,6 @@ def get_gpa_ranking(gpa: float) -> str:
     if 1.50 <= gpa < 2.00: return "Trung bình yếu"
     if 1.00 <= gpa < 1.50: return "Yếu"
     return "Kém"
-class PDF(FPDF):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        try: self.add_font('Roboto', '', 'Roboto-Regular.ttf', uni=True); self.font_family = 'Roboto'
-        except RuntimeError: st.error("Lỗi: Không tìm thấy file font 'Roboto-Regular.ttf'."); self.font_family = 'Arial'
-    def header(self): self.set_font(self.font_family, 'B', 16); self.cell(0, 10, 'BÁO CÁO KẾT QUẢ HỌC TẬP', 0, 1, 'C'); self.ln(5)
-    def footer(self): self.set_y(-15); self.set_font(self.font_family, 'I', 8); self.cell(0, 10, f'Trang {self.page_no()}/{{nb}}', 0, 0, 'C')
-    def chapter_title(self, title): self.set_font(self.font_family, 'B', 12); self.cell(0, 10, title, 0, 1, 'L'); self.ln(2)
-    def student_info(self, info: Dict):
-        self.set_font(self.font_family, '', 11)
-        for key, value in info.items():
-            self.set_font(self.font_family, 'B', 11); self.cell(40, 7, f'{key}:'); self.set_font(self.font_family, '', 11); self.cell(0, 7, value); self.ln()
-        self.ln(5)
-    def create_table(self, data: pd.DataFrame, column_widths: List):
-        self.set_font(self.font_family, 'B', 10)
-        for col, width in zip(data.columns, column_widths): self.cell(width, 8, col, 1, 0, 'C')
-        self.ln()
-        self.set_font(self.font_family, '', 10)
-        for _, row in data.iterrows():
-            for col, width in zip(data.columns, column_widths):
-                text = str(row[col]).replace('**', ''); self.cell(width, 7, text, 1, 0, 'C' if col != "Học kỳ" and col != "Course" else "L")
-            self.ln()
 def generate_pdf_report(student_info, summary_df, detailed_dfs, total_summary):
     pdf = PDF()
     pdf.alias_nb_pages(); pdf.add_page()
@@ -152,7 +144,8 @@ def generate_pdf_report(student_info, summary_df, detailed_dfs, total_summary):
         if not df.empty:
             pdf.set_font(pdf.font_family, 'B', 11); pdf.cell(0, 10, f'Học kỳ {i+1}', 0, 1)
             df_display = df.copy(); df_display.insert(0, 'STT', range(1, len(df_display) + 1))
-            pdf.create_table(df_display[['STT', 'Course', 'Credits', 'Grade', 'Category']], column_widths=[10, 80, 20, 20, 60])
+            pdf_display = df_display.rename(columns={"Course": "Tên môn học", "Credits": "TC", "Grade": "Điểm", "Category": "Phân loại"})
+            pdf.create_table(df_display[['STT', 'Tên môn học', 'TC', 'Điểm', 'Phân loại']], column_widths=[10, 80, 15, 15, 70])
             pdf.ln(5)
     return pdf.output(dest='S').encode('latin1')
 
@@ -236,7 +229,7 @@ with tab1:
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
     n_sem = st.number_input("Số học kỳ (semesters)", min_value=1, max_value=20, value=st.session_state.get('n_sem_input', 8), step=1, key="n_sem_input")
-    if "manual_warnings" not in st.session_state or len(st.session_state.manual_warnings) != n_sem: st.session_state.manual_warnings = ["Tự động"] * n_sem
+    if "manual_warnings" not in st.session_state or len(st.session_state.manual_warnings) != n_sem: st.session_state.manual_warnings = ["Không"] * n_sem
     if len(st.session_state.sems) != n_sem:
         current_sems = st.session_state.get("sems", []); current_len = len(current_sems)
         if current_len < n_sem: current_sems += [pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]) for _ in range(n_sem - current_len)]
@@ -266,16 +259,20 @@ with tab1:
             m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}")
             m3.metric("Tín chỉ nợ tích lũy", value=f"{cumulative_f_credits:.2f}", delta=f"{current_f_credits:.2f} TC nợ mới" if current_f_credits > 0 else None, delta_color="inverse")
             st.write("##### Tình trạng học vụ")
-            if i == 0:
-                st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
-            else:
+            if i > 0:
                 w_col1, w_col2 = st.columns(2)
                 with w_col1: st.metric("Kết quả XLHV học kỳ trước:", f"Mức {previous_warning_level}" if previous_warning_level > 0 else "Không")
                 with w_col2: st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
-            manual_warning_options = ["Tự động", "Không", "Mức 1", "Mức 2", "Mức 3"]
-            selected_warning_str = st.selectbox("Xử lý học vụ (chính thức):", options=manual_warning_options, index=manual_warning_options.index(st.session_state.manual_warnings[i]), key=f"manual_warning_{i}")
+            else:
+                st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
+            
+            manual_warning_options = ["Không", "Mức 1", "Mức 2", "Mức 3", "Xóa tên khỏi danh sách"]
+            selected_warning_str = st.selectbox("Xử lý học vụ (chính thức):", options=manual_warning_options, index=manual_warning_options.index(st.session_state.manual_warnings[i]) if st.session_state.manual_warnings[i] in manual_warning_options else 0, key=f"manual_warning_{i}")
             st.session_state.manual_warnings[i] = selected_warning_str
-            final_warning_level = auto_warning_level if selected_warning_str == "Tự động" else (0 if selected_warning_str == "Không" else int(selected_warning_str.split(" ")[1]))
+            
+            warning_map = {"Không": 0, "Mức 1": 1, "Mức 2": 2, "Mức 3": 3, "Xóa tên khỏi danh sách": 4}
+            final_warning_level = warning_map.get(selected_warning_str, 0)
+            
             warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": final_warning_level, "Lý do": ", ".join(auto_reasons) if auto_reasons else "Không có"})
             previous_warning_level = final_warning_level
             with st.expander("🔴 Thao tác Nguy hiểm"):
@@ -352,7 +349,8 @@ with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     def style_warning_html(level):
         if level == 0: return f'<p style="color: green; margin:0;">Không</p>'
         if level == 1: return f'<p style="color: orange; font-weight: bold; margin:0;">Mức {level}</p>'
-        return f'<p style="color: red; font-weight: bold; margin:0;">Mức {level}</p>'
+        if level in [2, 3]: return f'<p style="color: red; font-weight: bold; margin:0;">Mức {level}</p>'
+        if level == 4: return f'<p style="color: white; background-color: black; font-weight: bold; margin:0; padding: 2px 5px; border-radius: 3px;">Xóa tên</p>'
     display_df = pd.DataFrame(warning_history)
     display_df["Mức Cảnh báo"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
     display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Cảnh báo": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
