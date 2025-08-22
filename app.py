@@ -240,4 +240,94 @@ with tab1:
             st.subheader("Chi tiết theo khối kiến thức")
             left_col, right_col = st.columns(2)
             for i, row in detail_df.iterrows():
-                target_col = left_col if i % 2 == 0
+                target_col = left_col if i % 2 == 0 else right_col
+                with target_col:
+                    st.metric(label=str(row["Yêu cầu"]), value=f"{row['Đã hoàn thành']:.0f} / {row['Yêu cầu']:.0f}", delta=f"Còn lại: {row['Còn lại']:.0f}", delta_color="inverse")
+                    st.progress(row['Tiến độ'])
+    else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
+    st.divider()
+
+    n_sem = st.number_input("Số học kỳ (semesters)", min_value=1, max_value=20, value=st.session_state.get('n_sem_input', 8), step=1, key="n_sem_input")
+    if len(st.session_state.sems) != n_sem:
+        current_sems = st.session_state.get("sems", [])
+        current_len = len(current_sems)
+        if current_len < n_sem: current_sems += [pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]) for _ in range(n_sem - current_len)]
+        else: current_sems = current_sems[:n_sem]
+        st.session_state.sems = current_sems
+        st.rerun()
+
+    sem_tabs = st.tabs([f"Học kỳ {i+1}" for i in range(n_sem)])
+    per_sem_gpa, per_sem_cred, warning_history = [], [], []
+    cumulative_f_credits, previous_warning_level = 0.0, 0
+    fail_grades = [grade for grade, point in grade_map.items() if point == 0.0]
+
+    for i, tab in enumerate(sem_tabs):
+        with tab:
+            st.write(f"### Bảng điểm Học kỳ {i+1}")
+            df_with_delete = st.session_state.sems[i].copy(); df_with_delete.insert(0, "Xóa", False)
+            cols_action = st.columns([0.7, 0.15, 0.15]);
+            with cols_action[1]:
+                if st.button("🗑️ Xóa môn đã chọn", key=f"delete_{i}", use_container_width=True):
+                    edited_df_state = st.session_state[f"editor_{i}"]
+                    rows_to_keep = [row for _, row in edited_df_state.iterrows() if not row["Xóa"]]
+                    st.session_state.sems[i] = pd.DataFrame(rows_to_keep).drop(columns=["Xóa"]); st.rerun()
+            with cols_action[2]:
+                if st.button("🔄 Reset học kỳ", key=f"reset_{i}", use_container_width=True):
+                    st.session_state.sems[i] = pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]); st.rerun()
+            grade_options = list(grade_map.keys())
+            if not grade_options: st.warning("Chưa có thang điểm."); grade_options = ["..."]
+            edited = st.data_editor(df_with_delete, num_rows="dynamic", hide_index=True, use_container_width=True,
+                column_config={"Xóa": st.column_config.CheckboxColumn(width="small"), "Course": st.column_config.TextColumn("Tên môn học", width="large", required=True),"Credits": st.column_config.NumberColumn("Số tín chỉ", min_value=0.0, step=0.5, required=True),"Grade": st.column_config.SelectboxColumn("Điểm chữ", options=grade_options, required=True),"Category": st.column_config.SelectboxColumn("Phân loại", options=DEFAULT_COURSE_CATEGORIES_CURRENT, required=True)}, key=f"editor_{i}")
+            st.session_state.sems[i] = edited.drop(columns=["Xóa"])
+
+            current_sem_df = st.session_state.sems[i]
+            gpa = calc_gpa(current_sem_df, grade_map); per_sem_gpa.append(gpa)
+            creds = pd.to_numeric(current_sem_df["Credits"], errors="coerce").fillna(0.0).sum(); per_sem_cred.append(float(creds))
+            current_f_credits = pd.to_numeric(current_sem_df[current_sem_df["Grade"].isin(fail_grades)]["Credits"], errors="coerce").fillna(0.0).sum()
+            cumulative_f_credits += current_f_credits
+            warning_level, msg, reasons = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)
+            warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": warning_level, "Lý do": ", ".join(reasons) if reasons else "Không có"})
+            m1, m2, m3 = st.columns(3)
+            m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}"); m3.metric("Tín chỉ nợ tích lũy", f"{cumulative_f_credits:.2f}")
+            st.divider()
+            if warning_level > 0: st.warning(f"**{msg}**\n\n*Lý do: {' & '.join(reasons)}*")
+            else: st.success(f"**✅ {msg}**")
+            previous_warning_level = warning_level
+            
+    st.divider()
+    st.header("Tổng kết Toàn khóa")
+    all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
+    master_passed_df = pd.concat(all_passed_dfs) if all_passed_dfs else pd.DataFrame()
+    cgpa = calc_gpa(master_passed_df, grade_map)
+    total_passed_credits = pd.to_numeric(master_passed_df['Credits'], errors='coerce').fillna(0).sum()
+    colA, colB, colC = st.columns([1, 1, 2])
+    colA.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
+    colB.metric("📚 Tổng tín chỉ đã qua", f"{total_passed_credits:.2f}")
+    with colC:
+        if per_sem_gpa and all(c >= 0 for c in per_sem_cred):
+            try:
+                fig, ax = plt.subplots(); x = np.arange(1, len(per_sem_gpa) + 1)
+                ax.plot(x, per_sem_gpa, marker="o", linestyle="-", color='b')
+                ax.set_xlabel("Học kỳ"); ax.set_ylabel("GPA (SGPA)"); ax.set_title("Xu hướng GPA theo học kỳ")
+                ax.set_xticks(x); ax.grid(True, linestyle=":", linewidth=0.5)
+                ax.set_ylim(bottom=0, top=max(4.1, max(per_sem_gpa) * 1.1 if per_sem_gpa and any(v > 0 for v in per_sem_gpa) else 4.1))
+                st.pyplot(fig, use_container_width=True)
+            except Exception: st.info("Chưa đủ dữ liệu để vẽ biểu đồ.")
+
+with tab2:
+    st.header("Bảng điểm Tổng hợp theo Học kỳ và Năm học")
+    summary_data, cumulative_credits, cumulative_qp = [], 0.0, 0.0
+    for i in range(len(st.session_state.sems)):
+        sem_df = st.session_state.sems[i]
+        sem_gpa = per_sem_gpa[i]
+        passed_df = sem_df[~sem_df['Grade'].isin(fail_grades)]
+        passed_credits = pd.to_numeric(passed_df['Credits'], errors='coerce').fillna(0).sum()
+        sem_qp = calc_gpa(passed_df, grade_map) * passed_credits
+        cumulative_credits += passed_credits
+        cumulative_qp += sem_qp
+        cumulative_gpa = (cumulative_qp / cumulative_credits) if cumulative_credits > 0 else 0.0
+        summary_data.append({"Học kỳ": f"Học kỳ {i + 1}", "TBC Hệ 4 (SGPA)": f"{sem_gpa:.2f}", "TBTL Hệ 4 (CGPA)": f"{cumulative_gpa:.2f}", "Số TC Đạt": int(passed_credits), "Số TCTL Đạt": int(cumulative_credits)})
+        if (i + 1) % 2 == 0:
+            year_str = f"Năm học {2021 + i//2} - {2022 + i//2}"
+            summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(cumulative_credits)}**"})
+    st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
