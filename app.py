@@ -45,7 +45,7 @@ WARNING_STR_TO_LEVEL = {"Không": 0, "Mức 1": 1, "Mức 2": 2, "Mức 3": 3, "
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
-# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên và thêm hàm PDF)
+# ... (Các hàm khác giữ nguyên)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -60,15 +60,23 @@ def calc_gpa(df: pd.DataFrame, grade_map: Dict[str, float]) -> float:
     total_credits = pd.to_numeric(work_passed["Credits"], errors="coerce").fillna(0.0).sum()
     if total_credits <= 0: return 0.0
     return (work_passed["QP"].sum()) / total_credits
+
+# NÂNG CẤP: Tích hợp lại logic cảnh báo chi tiết
 def check_academic_warning(semester_number: int, sgpa: float, cumulative_f_credits: float, previous_warning_level: int) -> Tuple[int, str, List[str]]:
     reasons, is_warning_condition_met = [], False
     if semester_number == 1 and sgpa < 0.80: is_warning_condition_met = True; reasons.append(f"SGPA học kỳ 1 ({sgpa:.2f}) < 0.80")
     elif semester_number > 1 and sgpa < 1.00: is_warning_condition_met = True; reasons.append(f"SGPA ({sgpa:.2f}) < 1.00")
     if cumulative_f_credits > 24: is_warning_condition_met = True; reasons.append(f"Tổng tín chỉ nợ ({cumulative_f_credits}) > 24")
+    
     current_warning_level = 0
-    if is_warning_condition_met: current_warning_level = min(previous_warning_level + 1, 3)
+    if is_warning_condition_met:
+        if previous_warning_level == 2: current_warning_level = 3
+        elif previous_warning_level == 1: current_warning_level = 2
+        else: current_warning_level = 1
+    
     if current_warning_level > 0: return current_warning_level, f"Cảnh báo học tập Mức {current_warning_level}", reasons
     return 0, "Đạt yêu cầu", []
+
 def calculate_progress(all_sems_data: List[pd.DataFrame], requirements: Dict, grade_map: Dict):
     if not any(not df.empty for df in all_sems_data): return pd.DataFrame()
     master_df = pd.concat(all_sems_data, ignore_index=True)
@@ -269,7 +277,7 @@ with tab1:
             st.write("##### Tình trạng học vụ")
             if i > 0:
                 w_col1, w_col2 = st.columns(2)
-                with w_col1: st.metric("Kết quả XLHV học kỳ trước (chính thức):", f"Mức {previous_warning_level}" if previous_warning_level > 0 else "Không")
+                with w_col1: st.metric("Kết quả XLHV học kỳ trước (chính thức):", f"Mức {previous_warning_level}" if 0 < previous_warning_level < 4 else ("Xóa tên" if previous_warning_level == 4 else "Không"))
                 with w_col2: st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
             else:
                 st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
@@ -356,4 +364,4 @@ with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Xử lý": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
     st.markdown(display_df[["<b>Học kỳ</b>", "<b>Mức Xử lý</b>", "<b>Lý do (gợi ý)</b>"]].to_html(escape=False, index=False), unsafe_allow_html=True)
 with st.expander("❓ Hướng dẫn"):
-    st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức cảnh báo chính thức của nhà trường tại mỗi học kỳ để ghi đè lên kết quả tính toán tự động của ứng dụng.""")
+    st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức xử lý chính thức của nhà trường tại mỗi học kỳ. Kết quả này sẽ được dùng để tính toán mức cảnh báo dự kiến cho học kỳ tiếp theo.""")
