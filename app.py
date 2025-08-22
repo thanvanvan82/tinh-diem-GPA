@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
+import base64
 
 st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="🎓", layout="wide")
 
@@ -24,7 +25,6 @@ MAJORS_DATA = {
             "Thực tập và học phần tốt nghiệp": 13,
         },
         "preloaded_data": [
-            # Dữ liệu điểm của sinh viên Nguyễn Đình Mai Nam
             {'Course': 'Bóng chuyền 1', 'Credits': 1, 'Grade': 'D', 'Category': 'Giáo dục thể chất', 'Semester': 1},
             {'Course': 'Bóng chuyền 2', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1},
             {'Course': 'Bóng rổ', 'Credits': 1, 'Grade': 'B', 'Category': 'Giáo dục thể chất', 'Semester': 1},
@@ -99,6 +99,7 @@ PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
+# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -131,15 +132,15 @@ def calculate_progress(all_sems_data: List[pd.DataFrame], requirements: Dict, gr
     progress_data = []
     total_completed = passed_df["Credits"].sum()
     total_required = requirements.get("Tổng tín chỉ tích lũy", 1)
-    progress_data.append({"Yêu cầu": "Tổng tín chỉ", "Đã hoàn thành": total_completed, "Yêu cầu": total_required})
+    progress_data.append({"Khối kiến thức": "Tổng tín chỉ", "Tín chỉ Hoàn thành": total_completed, "Tín chỉ Yêu cầu": total_required})
     category_credits = passed_df.groupby("Category")["Credits"].sum()
     for category_name, required in requirements.items():
         if category_name == "Tổng tín chỉ tích lũy": continue
         completed = category_credits.get(category_name, 0.0)
-        progress_data.append({"Yêu cầu": category_name, "Đã hoàn thành": completed, "Yêu cầu": required})
+        progress_data.append({"Khối kiến thức": category_name, "Tín chỉ Hoàn thành": completed, "Tín chỉ Yêu cầu": required})
     df = pd.DataFrame(progress_data)
-    df["Còn lại"] = (df["Yêu cầu"] - df["Đã hoàn thành"]).clip(lower=0)
-    df["Tiến độ"] = (df["Đã hoàn thành"] / df["Yêu cầu"]).clip(0, 1) if df["Yêu cầu"].all() > 0 else 0
+    df["Còn lại"] = (df["Tín chỉ Yêu cầu"] - df["Tín chỉ Hoàn thành"]).clip(lower=0)
+    df["Tiến độ"] = (df["Tín chỉ Hoàn thành"] / df["Tín chỉ Yêu cầu"]).clip(0, 1) if df["Tín chỉ Yêu cầu"].all() > 0 else 0
     return df
 def get_preloaded_sems_from_major(major_name):
     data = MAJORS_DATA[major_name].get("preloaded_data", [])
@@ -155,52 +156,80 @@ def get_preloaded_sems_from_major(major_name):
 # -----------------------------
 # SIDEBAR
 # -----------------------------
-st.sidebar.title("⚙️ Cài đặt")
-# NÂNG CẤP: Hộp thông tin sinh viên
-st.sidebar.subheader("Thông tin Sinh viên")
-# Khởi tạo giá trị mặc định cho session_state nếu chưa có
-if "sv_hoten" not in st.session_state:
-    st.session_state.sv_hoten = "Nguyễn Đình Mai Nam"
-    st.session_state.sv_mssv = "2151113235"
-    st.session_state.sv_lop = "63CT2"
-st.text_input("Họ và tên:", key="sv_hoten")
-st.text_input("Mã số sinh viên:", key="sv_mssv")
-st.text_input("Lớp:", key="sv_lop")
-st.sidebar.divider()
-
-st.sidebar.subheader("Thang điểm")
-scale_name = st.sidebar.selectbox("Chọn thang điểm:", list(PRESET_SCALES.keys()), index=0)
-grade_map = PRESET_SCALES[scale_name]
-st.sidebar.divider()
-st.sidebar.subheader("📁 Nhập / Xuất File")
-if st.sidebar.button("⬇️ Xuất toàn bộ dữ liệu (CSV)"):
-    all_dfs = []
-    for i, df in enumerate(st.session_state.get("sems", [])):
-        df_copy = df.copy(); df_copy["Semester"] = i + 1; all_dfs.append(df_copy)
-    if any(not df.empty for df in all_dfs):
-        master_df = pd.concat(all_dfs, ignore_index=True)
-        st.sidebar.download_button(label="Tải về file tổng hợp", data=to_csv(master_df), file_name="GPA_data_all_semesters.csv", mime="text/csv", use_container_width=True)
-    else: st.sidebar.warning("Chưa có dữ liệu để xuất.")
-def on_file_upload(): st.session_state.file_processed = False
-upload = st.sidebar.file_uploader("Nhập file CSV (có cột Semester, Category)", type=["csv"], key="uploader", on_change=on_file_upload)
+with st.sidebar:
+    st.title("⚙️ Cài đặt")
+    st.subheader("Thang điểm")
+    scale_name = st.selectbox("Chọn thang điểm:", list(PRESET_SCALES.keys()), index=0)
+    grade_map = PRESET_SCALES[scale_name]
+    st.divider()
+    st.subheader("📁 Nhập / Xuất File")
+    if st.button("⬇️ Xuất toàn bộ dữ liệu (CSV)"):
+        all_dfs = []
+        for i, df in enumerate(st.session_state.get("sems", [])):
+            df_copy = df.copy(); df_copy["Semester"] = i + 1; all_dfs.append(df_copy)
+        if any(not df.empty for df in all_dfs):
+            master_df = pd.concat(all_dfs, ignore_index=True)
+            st.download_button(label="Tải về file tổng hợp", data=to_csv(master_df), file_name="GPA_data_all_semesters.csv", mime="text/csv", use_container_width=True)
+        else: st.warning("Chưa có dữ liệu để xuất.")
+    def on_file_upload(): st.session_state.file_processed = False
+    upload = st.file_uploader("Nhập file CSV (có cột Semester, Category)", type=["csv"], key="uploader", on_change=on_file_upload)
+    st.divider()
+    # NÂNG CẤP: Nút in ra PDF
+    st.subheader("🖨️ In Bảng điểm")
+    print_button_html = """
+    <style>
+    @media print {
+        /* Ẩn các thành phần không cần thiết khi in */
+        [data-testid="stSidebar"], [data-testid="stHeader"], .stButton {
+            display: none !important;
+        }
+        /* Căn chỉnh lại layout chính cho vừa trang in */
+        [data-testid="stAppViewContainer"] {
+            padding-top: 0 !important;
+        }
+    }
+    .print-button {
+        display: inline-block;
+        padding: 0.5em 1em;
+        color: white;
+        background-color: #FF4B4B;
+        border: none;
+        border-radius: 0.25rem;
+        text-decoration: none;
+        text-align: center;
+        width: 100%;
+    }
+    .print-button:hover {
+        background-color: #C63232;
+        color: white;
+    }
+    </style>
+    <button onclick="window.print()" class="print-button">In ra PDF</button>
+    """
+    st.markdown(print_button_html, unsafe_allow_html=True)
 
 # -----------------------------
 # GIAO DIỆN CHÍNH
 # -----------------------------
 st.title("🎓 Hệ thống Tư vấn Học tập")
-def on_major_change():
-    major = st.session_state.major_selector
-    sems, max_sem = get_preloaded_sems_from_major(major)
-    st.session_state.sems = sems
-    st.session_state.n_sem_input = max_sem
-selected_major = st.selectbox("Chọn ngành học:", options=list(MAJORS_DATA.keys()), key="major_selector", on_change=on_major_change)
+with st.container(border=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.text_input("Họ và tên:", value="Nguyễn Đình Mai Nam", key="sv_hoten")
+        st.text_input("Mã số sinh viên:", value="2151113235", key="sv_mssv")
+    with col2:
+        st.text_input("Lớp:", value="63CT2", key="sv_lop")
+        def on_major_change():
+            major = st.session_state.major_selector
+            sems, max_sem = get_preloaded_sems_from_major(major)
+            st.session_state.sems = sems
+            st.session_state.n_sem_input = max_sem
+        selected_major = st.selectbox("Ngành học:", options=list(MAJORS_DATA.keys()), key="major_selector", on_change=on_major_change)
+st.divider()
 if "sems" not in st.session_state: on_major_change()
 
-# NÂNG CẤP: Hiển thị thông tin sinh viên động
-st.markdown(f"`{st.session_state.sv_mssv} - {st.session_state.sv_hoten} - {st.session_state.sv_lop} - {selected_major}`")
 GRADUATION_REQUIREMENTS_CURRENT = MAJORS_DATA[selected_major]['graduation_requirements']
 DEFAULT_COURSE_CATEGORIES_CURRENT = MAJORS_DATA[selected_major]['course_categories']
-
 if upload is not None and not st.session_state.get('file_processed', False):
     try:
         df_up = pd.read_csv(upload, encoding='utf-8')
@@ -222,17 +251,17 @@ with tab1:
     progress_df = calculate_progress(st.session_state.sems, GRADUATION_REQUIREMENTS_CURRENT, grade_map)
     if not progress_df.empty:
         total_progress = progress_df.iloc[0]
-        st.subheader(f"Tổng quan: {total_progress['Đã hoàn thành']:.0f} / {total_progress['Yêu cầu']:.0f} tín chỉ đã tích lũy")
+        st.subheader(f"Tổng quan: {total_progress['Tín chỉ Hoàn thành']:.0f} / {total_progress['Tín chỉ Yêu cầu']:.0f} tín chỉ đã tích lũy")
         st.progress(total_progress['Tiến độ'], text=f"{total_progress['Tiến độ']:.1%}")
         st.markdown("---")
-        detail_df = progress_df[progress_df['Yêu cầu'] > 0].iloc[1:].reset_index(drop=True)
+        detail_df = progress_df[progress_df['Tín chỉ Yêu cầu'] > 0].iloc[1:].reset_index(drop=True)
         if not detail_df.empty:
             st.subheader("Chi tiết theo khối kiến thức")
             left_col, right_col = st.columns(2)
             for i, row in detail_df.iterrows():
                 target_col = left_col if i % 2 == 0 else right_col
                 with target_col:
-                    st.metric(label=str(row["Yêu cầu"]), value=f"{row['Đã hoàn thành']:.0f} / {row['Yêu cầu']:.0f}", delta=f"Còn lại: {row['Còn lại']:.0f}", delta_color="inverse")
+                    st.metric(label=str(row["Khối kiến thức"]), value=f"{row['Tín chỉ Hoàn thành']:.0f} / {row['Tín chỉ Yêu cầu']:.0f}", delta=f"Còn lại: {row['Còn lại']:.0f}", delta_color="inverse")
                     st.progress(row['Tiến độ'])
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
@@ -242,8 +271,7 @@ with tab1:
         current_len = len(current_sems)
         if current_len < n_sem: current_sems += [pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]) for _ in range(n_sem - current_len)]
         else: current_sems = current_sems[:n_sem]
-        st.session_state.sems = current_sems
-        st.rerun()
+        st.session_state.sems = current_sems; st.rerun()
     sem_tabs = st.tabs([f"Học kỳ {i+1}" for i in range(n_sem)])
     per_sem_gpa, per_sem_cred, warning_history = [], [], []
     cumulative_f_credits, previous_warning_level = 0.0, 0
@@ -302,8 +330,7 @@ with tab1:
 with tab2:
     st.header("Bảng điểm Tổng hợp theo Học kỳ và Năm học")
     summary_data, cumulative_credits, cumulative_qp = [], 0.0, 0.0
-    # NÂNG CẤP: Logic hiển thị năm tương đối
-    year_map = {1: "thứ nhất", 2: "thứ hai", 3: "thứ ba", 4: "thứ tư"}
+    year_map = {1: "thứ nhất", 2: "thứ hai", 3: "thứ ba", 4: "thứ tư", 5: "thứ năm"}
     for i in range(len(st.session_state.sems)):
         sem_df = st.session_state.sems[i]
         sem_gpa = per_sem_gpa[i]
