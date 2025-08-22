@@ -9,12 +9,8 @@ st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="�
 # -----------------------------
 # DỮ LIỆU CẤU HÌNH & HẰNG SỐ
 # -----------------------------
-
-# NÂNG CẤP: Cấu trúc dữ liệu trung tâm cho nhiều ngành học
-# Để thêm ngành mới, chỉ cần sao chép cấu trúc của một ngành và cập nhật dữ liệu.
 MAJORS_DATA = {
     "Công nghệ kỹ thuật xây dựng": {
-        "student_info": "2151113235 - Nguyễn Đình Mai Nam - 63CT2 - Công nghệ kỹ thuật xây dựng",
         "course_categories": [
             "Lý luận chính trị", "Kỹ năng", "Ngoại ngữ", "Khoa học tự nhiên và tin học",
             "Giáo dục quốc phòng an ninh", "Giáo dục thể chất", "Kiến thức cơ sở khối ngành",
@@ -28,7 +24,7 @@ MAJORS_DATA = {
             "Thực tập và học phần tốt nghiệp": 13,
         },
         "preloaded_data": [
-            # Dữ liệu điểm của sinh viên Nguyễn Đình Mai Nam được đặt ở đây
+            # Dữ liệu điểm của sinh viên Nguyễn Đình Mai Nam
             {'Course': 'Bóng chuyền 1', 'Credits': 1, 'Grade': 'D', 'Category': 'Giáo dục thể chất', 'Semester': 1},
             {'Course': 'Bóng chuyền 2', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1},
             {'Course': 'Bóng rổ', 'Credits': 1, 'Grade': 'B', 'Category': 'Giáo dục thể chất', 'Semester': 1},
@@ -87,30 +83,22 @@ MAJORS_DATA = {
         ]
     },
     "Quản lý xây dựng": {
-        "student_info": "Nhập thông tin sinh viên ngành Quản lý xây dựng",
-        "course_categories": ["Kinh tế", "Luật", "Quản lý dự án", "Kỹ thuật cơ sở"], # Ví dụ
-        "graduation_requirements": { # Dữ liệu mẫu, cần thay thế
-            "Kinh tế": 40, "Luật": 20, "Quản lý dự án": 50, "Kỹ thuật cơ sở": 40,
-        },
-        "preloaded_data": [ # Dữ liệu mẫu, cần thay thế
+        "course_categories": ["Kinh tế", "Luật", "Quản lý dự án", "Kỹ thuật cơ sở"],
+        "graduation_requirements": { "Kinh tế": 40, "Luật": 20, "Quản lý dự án": 50, "Kỹ thuật cơ sở": 40, },
+        "preloaded_data": [
             {'Course': 'Kinh tế vi mô', 'Credits': 3, 'Grade': 'A', 'Category': 'Kinh tế', 'Semester': 1},
             {'Course': 'Luật xây dựng', 'Credits': 2, 'Grade': 'B', 'Category': 'Luật', 'Semester': 1},
         ]
     }
 }
-
-# Tính toán các giá trị tổng
 for major in MAJORS_DATA:
     total_required = sum(MAJORS_DATA[major]["graduation_requirements"].values())
     MAJORS_DATA[major]["graduation_requirements"]["Tổng tín chỉ tích lũy"] = total_required
+PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "F": 0.0}}
 
-PRESET_SCALES: Dict[str, Dict[str, float]] = {
-    "VN 4.0 (TLU)": {"A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "F": 0.0},
-}
 # -----------------------------
-# CÁC HÀM TIỆN ÍCH (Giữ nguyên)
+# CÁC HÀM TIỆN ÍCH
 # -----------------------------
-# ... (Các hàm calc_gpa, check_academic_warning, calculate_progress, to_csv giữ nguyên)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -168,7 +156,20 @@ def get_preloaded_sems_from_major(major_name):
 # SIDEBAR
 # -----------------------------
 st.sidebar.title("⚙️ Cài đặt")
-scale_name = st.sidebar.selectbox("Thang điểm", list(PRESET_SCALES.keys()), index=0)
+# NÂNG CẤP: Hộp thông tin sinh viên
+st.sidebar.subheader("Thông tin Sinh viên")
+# Khởi tạo giá trị mặc định cho session_state nếu chưa có
+if "sv_hoten" not in st.session_state:
+    st.session_state.sv_hoten = "Nguyễn Đình Mai Nam"
+    st.session_state.sv_mssv = "2151113235"
+    st.session_state.sv_lop = "63CT2"
+st.text_input("Họ và tên:", key="sv_hoten")
+st.text_input("Mã số sinh viên:", key="sv_mssv")
+st.text_input("Lớp:", key="sv_lop")
+st.sidebar.divider()
+
+st.sidebar.subheader("Thang điểm")
+scale_name = st.sidebar.selectbox("Chọn thang điểm:", list(PRESET_SCALES.keys()), index=0)
 grade_map = PRESET_SCALES[scale_name]
 st.sidebar.divider()
 st.sidebar.subheader("📁 Nhập / Xuất File")
@@ -187,28 +188,19 @@ upload = st.sidebar.file_uploader("Nhập file CSV (có cột Semester, Category
 # GIAO DIỆN CHÍNH
 # -----------------------------
 st.title("🎓 Hệ thống Tư vấn Học tập")
-
 def on_major_change():
     major = st.session_state.major_selector
     sems, max_sem = get_preloaded_sems_from_major(major)
     st.session_state.sems = sems
     st.session_state.n_sem_input = max_sem
+selected_major = st.selectbox("Chọn ngành học:", options=list(MAJORS_DATA.keys()), key="major_selector", on_change=on_major_change)
+if "sems" not in st.session_state: on_major_change()
 
-selected_major = st.selectbox(
-    "Chọn ngành học:",
-    options=list(MAJORS_DATA.keys()),
-    key="major_selector",
-    on_change=on_major_change
-)
-
-if "sems" not in st.session_state:
-    on_major_change()
-
-st.markdown(f"`{MAJORS_DATA[selected_major]['student_info']}`")
+# NÂNG CẤP: Hiển thị thông tin sinh viên động
+st.markdown(f"`{st.session_state.sv_mssv} - {st.session_state.sv_hoten} - {st.session_state.sv_lop} - {selected_major}`")
 GRADUATION_REQUIREMENTS_CURRENT = MAJORS_DATA[selected_major]['graduation_requirements']
 DEFAULT_COURSE_CATEGORIES_CURRENT = MAJORS_DATA[selected_major]['course_categories']
 
-# Logic xử lý file upload
 if upload is not None and not st.session_state.get('file_processed', False):
     try:
         df_up = pd.read_csv(upload, encoding='utf-8')
@@ -221,12 +213,10 @@ if upload is not None and not st.session_state.get('file_processed', False):
             new_sems = [df_up[df_up["Semester"] == i][["Course", "Credits", "Grade", "Category"]].reset_index(drop=True) for i in range(1, max_sem + 1)]
             st.session_state.sems = new_sems
             st.session_state.file_processed = True
-            st.success(f"Đã nhập và phân bổ dữ liệu cho {max_sem} học kỳ.")
-            st.rerun()
+            st.success(f"Đã nhập và phân bổ dữ liệu cho {max_sem} học kỳ."); st.rerun()
     except Exception as e: st.error(f"Không thể đọc file CSV: {e}"); st.session_state.file_processed = True
 
 tab1, tab2 = st.tabs(["Bảng điểm Chi tiết", "Bảng điểm Tổng hợp"])
-
 with tab1:
     st.header("📊 Bảng tổng quan Tiến độ Tốt nghiệp")
     progress_df = calculate_progress(st.session_state.sems, GRADUATION_REQUIREMENTS_CURRENT, grade_map)
@@ -246,7 +236,6 @@ with tab1:
                     st.progress(row['Tiến độ'])
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
-
     n_sem = st.number_input("Số học kỳ (semesters)", min_value=1, max_value=20, value=st.session_state.get('n_sem_input', 8), step=1, key="n_sem_input")
     if len(st.session_state.sems) != n_sem:
         current_sems = st.session_state.get("sems", [])
@@ -255,12 +244,10 @@ with tab1:
         else: current_sems = current_sems[:n_sem]
         st.session_state.sems = current_sems
         st.rerun()
-
     sem_tabs = st.tabs([f"Học kỳ {i+1}" for i in range(n_sem)])
     per_sem_gpa, per_sem_cred, warning_history = [], [], []
     cumulative_f_credits, previous_warning_level = 0.0, 0
     fail_grades = [grade for grade, point in grade_map.items() if point == 0.0]
-
     for i, tab in enumerate(sem_tabs):
         with tab:
             st.write(f"### Bảng điểm Học kỳ {i+1}")
@@ -279,7 +266,6 @@ with tab1:
             edited = st.data_editor(df_with_delete, num_rows="dynamic", hide_index=True, use_container_width=True,
                 column_config={"Xóa": st.column_config.CheckboxColumn(width="small"), "Course": st.column_config.TextColumn("Tên môn học", width="large", required=True),"Credits": st.column_config.NumberColumn("Số tín chỉ", min_value=0.0, step=0.5, required=True),"Grade": st.column_config.SelectboxColumn("Điểm chữ", options=grade_options, required=True),"Category": st.column_config.SelectboxColumn("Phân loại", options=DEFAULT_COURSE_CATEGORIES_CURRENT, required=True)}, key=f"editor_{i}")
             st.session_state.sems[i] = edited.drop(columns=["Xóa"])
-
             current_sem_df = st.session_state.sems[i]
             gpa = calc_gpa(current_sem_df, grade_map); per_sem_gpa.append(gpa)
             creds = pd.to_numeric(current_sem_df["Credits"], errors="coerce").fillna(0.0).sum(); per_sem_cred.append(float(creds))
@@ -293,7 +279,6 @@ with tab1:
             if warning_level > 0: st.warning(f"**{msg}**\n\n*Lý do: {' & '.join(reasons)}*")
             else: st.success(f"**✅ {msg}**")
             previous_warning_level = warning_level
-            
     st.divider()
     st.header("Tổng kết Toàn khóa")
     all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
@@ -317,6 +302,8 @@ with tab1:
 with tab2:
     st.header("Bảng điểm Tổng hợp theo Học kỳ và Năm học")
     summary_data, cumulative_credits, cumulative_qp = [], 0.0, 0.0
+    # NÂNG CẤP: Logic hiển thị năm tương đối
+    year_map = {1: "thứ nhất", 2: "thứ hai", 3: "thứ ba", 4: "thứ tư"}
     for i in range(len(st.session_state.sems)):
         sem_df = st.session_state.sems[i]
         sem_gpa = per_sem_gpa[i]
@@ -328,6 +315,8 @@ with tab2:
         cumulative_gpa = (cumulative_qp / cumulative_credits) if cumulative_credits > 0 else 0.0
         summary_data.append({"Học kỳ": f"Học kỳ {i + 1}", "TBC Hệ 4 (SGPA)": f"{sem_gpa:.2f}", "TBTL Hệ 4 (CGPA)": f"{cumulative_gpa:.2f}", "Số TC Đạt": int(passed_credits), "Số TCTL Đạt": int(cumulative_credits)})
         if (i + 1) % 2 == 0:
-            year_str = f"Năm học {2021 + i//2} - {2022 + i//2}"
+            year_number = (i // 2) + 1
+            year_text = year_map.get(year_number, f"thứ {year_number}")
+            year_str = f"Năm {year_text}"
             summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(cumulative_credits)}**"})
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
