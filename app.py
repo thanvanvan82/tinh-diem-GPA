@@ -3,7 +3,6 @@ import pandas as pd
 from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
-import base64
 
 st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="🎓", layout="wide")
 
@@ -12,74 +11,17 @@ st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="�
 # -----------------------------
 MAJORS_DATA = {
     "Công nghệ kỹ thuật xây dựng": {
-        "course_categories": [
-            "Lý luận chính trị", "Kỹ năng", "Ngoại ngữ", "Khoa học tự nhiên và tin học",
-            "Giáo dục quốc phòng an ninh", "Giáo dục thể chất", "Kiến thức cơ sở khối ngành",
-            "Kiến thức cơ sở ngành", "Kiến thức ngành", "Kiến thức tự chọn",
-            "Thực tập và học phần tốt nghiệp", "Môn học điều kiện", "Chuẩn đầu ra"
-        ],
-        "graduation_requirements": {
-            "Lý luận chính trị": 13, "Kỹ năng": 3, "Ngoại ngữ": 6, "Khoa học tự nhiên và tin học": 21,
-            "Giáo dục quốc phòng an ninh": 11, "Giáo dục thể chất": 34, "Kiến thức cơ sở khối ngành": 31,
-            "Kiến thức cơ sở ngành": 22, "Kiến thức ngành": 39, "Kiến thức tự chọn": 27,
-            "Thực tập và học phần tốt nghiệp": 13,
-        },
+        "course_categories": ["Lý luận chính trị", "Kỹ năng", "Ngoại ngữ", "Khoa học tự nhiên và tin học", "Giáo dục quốc phòng an ninh", "Giáo dục thể chất", "Kiến thức cơ sở khối ngành", "Kiến thức cơ sở ngành", "Kiến thức ngành", "Kiến thức tự chọn", "Thực tập và học phần tốt nghiệp", "Môn học điều kiện", "Chuẩn đầu ra"],
+        "graduation_requirements": {"Lý luận chính trị": 13, "Kỹ năng": 3, "Ngoại ngữ": 6, "Khoa học tự nhiên và tin học": 21, "Giáo dục quốc phòng an ninh": 11, "Giáo dục thể chất": 34, "Kiến thức cơ sở khối ngành": 31, "Kiến thức cơ sở ngành": 22, "Kiến thức ngành": 39, "Kiến thức tự chọn": 27, "Thực tập và học phần tốt nghiệp": 13},
         "preloaded_data": [
-            {'Course': 'Bóng chuyền 1', 'Credits': 1, 'Grade': 'D', 'Category': 'Giáo dục thể chất', 'Semester': 1},
-            {'Course': 'Bóng chuyền 2', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1},
-            {'Course': 'Bóng rổ', 'Credits': 1, 'Grade': 'B', 'Category': 'Giáo dục thể chất', 'Semester': 1},
-            {'Course': 'Hóa học đại cương', 'Credits': 3, 'Grade': 'D', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1},
-            {'Course': 'Cầu lông', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1},
-            {'Course': 'Tin học cơ bản', 'Credits': 2, 'Grade': 'B', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1},
-            {'Course': 'Giải tích hàm một biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1},
-            {'Course': 'Kỹ năng mềm và tinh thần khởi nghiệp', 'Credits': 3, 'Grade': 'B', 'Category': 'Kỹ năng', 'Semester': 1},
-            {'Course': 'Sức bền vật liệu 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2},
-            {'Course': 'Vật liệu xây dựng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2},
-            {'Course': 'Sức bền vật liệu 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2},
-            {'Course': 'Tiếng Anh 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Ngoại ngữ', 'Semester': 2},
-            {'Course': 'Cơ học chất lỏng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2},
-            {'Course': 'Pháp luật đại cương', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 2},
-            {'Course': 'Địa chất công trình', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 2},
-            {'Course': 'Triết học Mác - Lênin', 'Credits': 3, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 2},
-            {'Course': 'Vật lý 2', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 3},
-            {'Course': 'Đồ họa kỹ thuật 1', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3},
-            {'Course': 'Đồ họa kỹ thuật 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3},
-            {'Course': 'Kỹ thuật điện', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3},
-            {'Course': 'Nền móng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3},
-            {'Course': 'Cơ học đất', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3},
-            {'Course': 'Tư tưởng Hồ Chí Minh', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 3},
-            {'Course': 'Thủy lực công trình', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 4},
-            {'Course': 'Thủy văn công trình', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 4},
-            {'Course': 'Giải tích hàm nhiều biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4},
-            {'Course': 'Kinh tế chính trị Mác - Lênin', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 4},
-            {'Course': 'Nhập môn ngành Công nghệ kỹ thuật xây dựng', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 4},
-            {'Course': 'Chủ nghĩa xã hội khoa học', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 4},
-            {'Course': 'Thống kê trong kỹ thuật', 'Credits': 2, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4},
-            {'Course': 'Trắc địa', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5},
-            {'Course': 'Thực tập trắc địa', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5},
-            {'Course': 'Kinh tế xây dựng 1', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5},
-            {'Course': 'Cơ sở thiết kế công trình dân dụng và công nghiệp', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 5},
-            {'Course': 'Ứng dụng BIM trong xây dựng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5},
-            {'Course': 'Công nghệ xây dựng công trình bê tông', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5},
-            {'Course': 'Công nghệ xây dựng công trình đất đá', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Công nghệ xử lý nền móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Quản lý đầu tư xây dựng', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'An toàn xây dựng', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Tổ chức xây dựng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Thi công công trình ngầm', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6},
-            {'Course': 'Lịch sử Đảng Cộng sản Việt Nam', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 7},
-            {'Course': 'Máy xây dựng', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7},
-            {'Course': 'Giới thiệu và cơ sở thiết kế công trình thủy', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7},
-            {'Course': 'Thiết kế công trình cầu đường', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7},
-            {'Course': 'Thiết kế đê và công trình bảo vệ bờ sông', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức ngành', 'Semester': 7},
-            {'Course': 'Thực tập địa chất công trình', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 7},
-            {'Course': 'Thực tập kỹ thuật và tổ chức xây dựng', 'Credits': 3, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8},
-            {'Course': 'Đồ án tổ chức xây dựng', 'Credits': 1, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8},
-            {'Course': 'Đồ án công nghệ xây dựng công trình bê tông', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8},
-            {'Course': 'Đồ án công nghệ xây dựng công trình đất đá', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8},
-            {'Course': 'Dẫn dòng thi công và công tác hố móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8},
-            {'Course': 'Đồ án dẫn dòng thi công và công tác hố móng', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8},
-            {'Course': 'Giám sát chất lượng công trình', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8},
+            {'Course': 'Bóng chuyền 1', 'Credits': 1, 'Grade': 'D', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Bóng chuyền 2', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Bóng rổ', 'Credits': 1, 'Grade': 'B', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Hóa học đại cương', 'Credits': 3, 'Grade': 'D', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Cầu lông', 'Credits': 1, 'Grade': 'C', 'Category': 'Giáo dục thể chất', 'Semester': 1}, {'Course': 'Tin học cơ bản', 'Credits': 2, 'Grade': 'B', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Giải tích hàm một biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 1}, {'Course': 'Kỹ năng mềm và tinh thần khởi nghiệp', 'Credits': 3, 'Grade': 'B', 'Category': 'Kỹ năng', 'Semester': 1},
+            {'Course': 'Sức bền vật liệu 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Vật liệu xây dựng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Sức bền vật liệu 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Tiếng Anh 1', 'Credits': 3, 'Grade': 'C', 'Category': 'Ngoại ngữ', 'Semester': 2}, {'Course': 'Cơ học chất lỏng', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức cơ sở ngành', 'Semester': 2}, {'Course': 'Pháp luật đại cương', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 2}, {'Course': 'Địa chất công trình', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 2}, {'Course': 'Triết học Mác - Lênin', 'Credits': 3, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 2},
+            {'Course': 'Vật lý 2', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 3}, {'Course': 'Đồ họa kỹ thuật 1', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Đồ họa kỹ thuật 2', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Kỹ thuật điện', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 3}, {'Course': 'Nền móng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3}, {'Course': 'Cơ học đất', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 3}, {'Course': 'Tư tưởng Hồ Chí Minh', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 3},
+            {'Course': 'Thủy lực công trình', 'Credits': 3, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 4}, {'Course': 'Thủy văn công trình', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 4}, {'Course': 'Giải tích hàm nhiều biến', 'Credits': 3, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4}, {'Course': 'Kinh tế chính trị Mác - Lênin', 'Credits': 2, 'Grade': 'C', 'Category': 'Lý luận chính trị', 'Semester': 4}, {'Course': 'Nhập môn ngành Công nghệ kỹ thuật xây dựng', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 4}, {'Course': 'Chủ nghĩa xã hội khoa học', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 4}, {'Course': 'Thống kê trong kỹ thuật', 'Credits': 2, 'Grade': 'C', 'Category': 'Khoa học tự nhiên và tin học', 'Semester': 4},
+            {'Course': 'Trắc địa', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5}, {'Course': 'Thực tập trắc địa', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 5}, {'Course': 'Kinh tế xây dựng 1', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Cơ sở thiết kế công trình dân dụng và công nghiệp', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Ứng dụng BIM trong xây dựng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5}, {'Course': 'Công nghệ xây dựng công trình bê tông', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 5},
+            {'Course': 'Công nghệ xây dựng công trình đất đá', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Công nghệ xử lý nền móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Quản lý đầu tư xây dựng', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'An toàn xây dựng', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Tổ chức xây dựng', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 6}, {'Course': 'Thi công công trình ngầm', 'Credits': 2, 'Grade': 'C', 'Category': 'Kiến thức ngành', 'Semester': 6},
+            {'Course': 'Lịch sử Đảng Cộng sản Việt Nam', 'Credits': 2, 'Grade': 'D', 'Category': 'Lý luận chính trị', 'Semester': 7}, {'Course': 'Máy xây dựng', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Giới thiệu và cơ sở thiết kế công trình thủy', 'Credits': 2, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thiết kế công trình cầu đường', 'Credits': 3, 'Grade': 'D', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thiết kế đê và công trình bảo vệ bờ sông', 'Credits': 2, 'Grade': 'A', 'Category': 'Kiến thức ngành', 'Semester': 7}, {'Course': 'Thực tập địa chất công trình', 'Credits': 1, 'Grade': 'C', 'Category': 'Kiến thức cơ sở khối ngành', 'Semester': 7},
+            {'Course': 'Thực tập kỹ thuật và tổ chức xây dựng', 'Credits': 3, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án tổ chức xây dựng', 'Credits': 1, 'Grade': 'A', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án công nghệ xây dựng công trình bê tông', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Đồ án công nghệ xây dựng công trình đất đá', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Dẫn dòng thi công và công tác hố móng', 'Credits': 2, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8}, {'Course': 'Đồ án dẫn dòng thi công và công tác hố móng', 'Credits': 1, 'Grade': 'B', 'Category': 'Thực tập và học phần tốt nghiệp', 'Semester': 8}, {'Course': 'Giám sát chất lượng công trình', 'Credits': 3, 'Grade': 'B', 'Category': 'Kiến thức ngành', 'Semester': 8},
         ]
     },
     "Quản lý xây dựng": {
@@ -164,7 +106,7 @@ with st.sidebar:
     st.divider()
     st.subheader("📁 Nhập / Xuất File")
     if st.button("⬇️ Xuất toàn bộ dữ liệu (CSV)"):
-        all_dfs = []
+        all_dfs = [];
         for i, df in enumerate(st.session_state.get("sems", [])):
             df_copy = df.copy(); df_copy["Semester"] = i + 1; all_dfs.append(df_copy)
         if any(not df.empty for df in all_dfs):
@@ -174,38 +116,8 @@ with st.sidebar:
     def on_file_upload(): st.session_state.file_processed = False
     upload = st.file_uploader("Nhập file CSV (có cột Semester, Category)", type=["csv"], key="uploader", on_change=on_file_upload)
     st.divider()
-    # NÂNG CẤP: Nút in ra PDF
     st.subheader("🖨️ In Bảng điểm")
-    print_button_html = """
-    <style>
-    @media print {
-        /* Ẩn các thành phần không cần thiết khi in */
-        [data-testid="stSidebar"], [data-testid="stHeader"], .stButton {
-            display: none !important;
-        }
-        /* Căn chỉnh lại layout chính cho vừa trang in */
-        [data-testid="stAppViewContainer"] {
-            padding-top: 0 !important;
-        }
-    }
-    .print-button {
-        display: inline-block;
-        padding: 0.5em 1em;
-        color: white;
-        background-color: #FF4B4B;
-        border: none;
-        border-radius: 0.25rem;
-        text-decoration: none;
-        text-align: center;
-        width: 100%;
-    }
-    .print-button:hover {
-        background-color: #C63232;
-        color: white;
-    }
-    </style>
-    <button onclick="window.print()" class="print-button">In ra PDF</button>
-    """
+    print_button_html = """<style>@media print {[data-testid="stSidebar"], [data-testid="stHeader"], .stButton, [data-testid="stExpander"] {display: none !important;} [data-testid="stAppViewContainer"] {padding-top: 0 !important;}}</style><button onclick="window.print()">🖨️ In ra PDF</button>"""
     st.markdown(print_button_html, unsafe_allow_html=True)
 
 # -----------------------------
@@ -280,15 +192,6 @@ with tab1:
         with tab:
             st.write(f"### Bảng điểm Học kỳ {i+1}")
             df_with_delete = st.session_state.sems[i].copy(); df_with_delete.insert(0, "Xóa", False)
-            cols_action = st.columns([0.7, 0.15, 0.15]);
-            with cols_action[1]:
-                if st.button("🗑️ Xóa môn đã chọn", key=f"delete_{i}", use_container_width=True):
-                    edited_df_state = st.session_state[f"editor_{i}"]
-                    rows_to_keep = [row for _, row in edited_df_state.iterrows() if not row["Xóa"]]
-                    st.session_state.sems[i] = pd.DataFrame(rows_to_keep).drop(columns=["Xóa"]); st.rerun()
-            with cols_action[2]:
-                if st.button("🔄 Reset học kỳ", key=f"reset_{i}", use_container_width=True):
-                    st.session_state.sems[i] = pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]); st.rerun()
             grade_options = list(grade_map.keys())
             if not grade_options: st.warning("Chưa có thang điểm."); grade_options = ["..."]
             edited = st.data_editor(df_with_delete, num_rows="dynamic", hide_index=True, use_container_width=True,
@@ -307,6 +210,29 @@ with tab1:
             if warning_level > 0: st.warning(f"**{msg}**\n\n*Lý do: {' & '.join(reasons)}*")
             else: st.success(f"**✅ {msg}**")
             previous_warning_level = warning_level
+            # NÂNG CẤP: Khu vực nguy hiểm
+            with st.expander("🔴 Thao tác Nguy hiểm"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🗑️ Xóa môn đã chọn", key=f"delete_{i}", use_container_width=True, type="secondary"):
+                        rows_to_keep = [row for _, row in edited.iterrows() if not row["Xóa"]]
+                        st.session_state.sems[i] = pd.DataFrame(rows_to_keep).drop(columns=["Xóa"]); st.rerun()
+                with col2:
+                    if st.button("🔄 Reset học kỳ", key=f"confirm_reset_btn_{i}", use_container_width=True, type="secondary"):
+                        st.session_state[f"confirm_reset_{i}"] = True
+                if st.session_state.get(f"confirm_reset_{i}", False):
+                    st.warning("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu của học kỳ này không? Hành động này không thể hoàn tác.")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("⚠️ Vâng, tôi chắc chắn", key=f"reset_yes_{i}", use_container_width=True, type="primary"):
+                            st.session_state.sems[i] = pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"])
+                            st.session_state[f"confirm_reset_{i}"] = False
+                            st.rerun()
+                    with c2:
+                        if st.button("Hủy bỏ", key=f"reset_no_{i}", use_container_width=True):
+                            st.session_state[f"confirm_reset_{i}"] = False
+                            st.rerun()
+
     st.divider()
     st.header("Tổng kết Toàn khóa")
     all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
