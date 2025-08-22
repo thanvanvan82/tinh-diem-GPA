@@ -412,15 +412,19 @@ with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     st.markdown("##### Căn cứ theo Quy chế đào tạo")
     st.info("""
     *Trích QUYẾT ĐỊNH Số 1226 /QĐ-ĐHTL ngày 13 tháng 9 năm 2021 của Trường Đại học Thủy lợi*
+    
     **Điều 11. Xử lý kết quả học tập theo tín chỉ**
+    
     **1. Điều kiện cảnh báo:**
     - Điểm trung bình chung học kỳ đạt dưới **0,80** đối với học kỳ đầu, dưới **1,00** đối với các học kỳ tiếp theo.
     - Tổng số tín chỉ của các học phần bị điểm F còn tồn đọng tính từ đầu khóa học vượt quá **24 tín chỉ**.
+    
     **2. Các mức cảnh báo:**
     - **Mức 1:** Lần đầu tiên vi phạm điều kiện cảnh báo.
     - **Mức 2:** Vi phạm và đã bị cảnh báo Mức 1 ở học kỳ trước liền kề.
     - **Mức 3:** Vi phạm và đã bị cảnh báo Mức 2 ở học kỳ trước liền kề.
     - *Sinh viên sẽ được **xóa cảnh báo** nếu kết quả học tập ở học kỳ liền sau không vi phạm điều kiện.*
+    
     **3. Xử lý buộc thôi học:**
     - Nhận cảnh báo kết quả học tập ở **Mức 3**.
     """)
