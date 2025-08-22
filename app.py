@@ -40,6 +40,7 @@ for major in MAJORS_DATA:
     total_required = sum(MAJORS_DATA[major]["graduation_requirements"].values())
     MAJORS_DATA[major]["graduation_requirements"]["Tổng tín chỉ tích lũy"] = total_required
 PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "F": 0.0}}
+WARNING_STR_TO_LEVEL = {"Không": 0, "Mức 1": 1, "Mức 2": 2, "Mức 3": 3, "Xóa tên khỏi danh sách": 4}
 
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
@@ -132,7 +133,7 @@ class PDF(FPDF):
         self.set_font(self.font_family, '', 10)
         for _, row in data.iterrows():
             for col, width in zip(data.columns, column_widths):
-                text = str(row[col]).replace('**', ''); self.cell(width, 7, text, 1, 0, 'C' if col != "Học kỳ" and col != "Course" else "L")
+                text = str(row[col]).replace('**', ''); self.cell(width, 7, text, 1, 0, 'C' if col not in ["Học kỳ", "Course", "Tên môn học"] else "L")
             self.ln()
 def generate_pdf_report(student_info, summary_df, detailed_dfs, total_summary):
     pdf = PDF()
@@ -151,8 +152,8 @@ def generate_pdf_report(student_info, summary_df, detailed_dfs, total_summary):
     for i, df in enumerate(detailed_dfs):
         if not df.empty:
             pdf.set_font(pdf.font_family, 'B', 11); pdf.cell(0, 10, f'Học kỳ {i+1}', 0, 1)
-            df_display = df.copy(); df_display.insert(0, 'STT', range(1, len(df_display) + 1))
-            pdf.create_table(df_display[['STT', 'Course', 'Credits', 'Grade', 'Category']], column_widths=[10, 80, 20, 20, 60])
+            df_display = df.copy(); df_display.insert(0, 'STT', range(1, len(df_display) + 1)); df_display.rename(columns={'Course': 'Tên môn học', 'Credits': 'TC', 'Grade': 'Điểm', 'Category': 'Phân loại'}, inplace=True)
+            pdf.create_table(df_display[['STT', 'Tên môn học', 'TC', 'Điểm', 'Phân loại']], column_widths=[10, 80, 15, 20, 55])
             pdf.ln(5)
     return pdf.output(dest='S').encode('latin1')
 
@@ -236,7 +237,7 @@ with tab1:
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
     n_sem = st.number_input("Số học kỳ (semesters)", min_value=1, max_value=20, value=st.session_state.get('n_sem_input', 8), step=1, key="n_sem_input")
-    if "manual_warnings" not in st.session_state or len(st.session_state.manual_warnings) != n_sem: st.session_state.manual_warnings = ["Tự động"] * n_sem
+    if "manual_warnings" not in st.session_state or len(st.session_state.manual_warnings) != n_sem: st.session_state.manual_warnings = ["Không"] * n_sem
     if len(st.session_state.sems) != n_sem:
         current_sems = st.session_state.get("sems", []); current_len = len(current_sems)
         if current_len < n_sem: current_sems += [pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]) for _ in range(n_sem - current_len)]
@@ -266,16 +267,16 @@ with tab1:
             m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}")
             m3.metric("Tín chỉ nợ tích lũy", value=f"{cumulative_f_credits:.2f}", delta=f"{current_f_credits:.2f} TC nợ mới" if current_f_credits > 0 else None, delta_color="inverse")
             st.write("##### Tình trạng học vụ")
-            if i == 0:
-                st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
-            else:
+            if i > 0:
                 w_col1, w_col2 = st.columns(2)
-                with w_col1: st.metric("Kết quả XLHV học kỳ trước:", f"Mức {previous_warning_level}" if previous_warning_level > 0 else "Không")
+                with w_col1: st.metric("Kết quả XLHV học kỳ trước (chính thức):", f"Mức {previous_warning_level}" if previous_warning_level > 0 else "Không")
                 with w_col2: st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
-            manual_warning_options = ["Tự động", "Không", "Mức 1", "Mức 2", "Mức 3"]
+            else:
+                st.metric("Kết quả XLHV dự kiến:", f"Mức {auto_warning_level}" if auto_warning_level > 0 else "Không", delta="Dựa trên điểm kỳ này", delta_color="off")
+            manual_warning_options = ["Không", "Mức 1", "Mức 2", "Mức 3", "Xóa tên khỏi danh sách"]
             selected_warning_str = st.selectbox("Xử lý học vụ (chính thức):", options=manual_warning_options, index=manual_warning_options.index(st.session_state.manual_warnings[i]), key=f"manual_warning_{i}")
             st.session_state.manual_warnings[i] = selected_warning_str
-            final_warning_level = auto_warning_level if selected_warning_str == "Tự động" else (0 if selected_warning_str == "Không" else int(selected_warning_str.split(" ")[1]))
+            final_warning_level = WARNING_STR_TO_LEVEL[selected_warning_str]
             warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": final_warning_level, "Lý do": ", ".join(auto_reasons) if auto_reasons else "Không có"})
             previous_warning_level = final_warning_level
             with st.expander("🔴 Thao tác Nguy hiểm"):
@@ -337,7 +338,6 @@ with tab2:
             year_number = (i // 2) + 1; year_text = year_map.get(year_number, f"thứ {year_number}"); year_str = f"Năm {year_text}"
             summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(cumulative_credits)}**"})
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
-
 if st.session_state.get('pdf_generated', False):
     student_info_dict = {"Họ và tên": st.session_state.sv_hoten, "Mã SV": st.session_state.sv_mssv, "Lớp": st.session_state.sv_lop, "Ngành học": selected_major}
     summary_df_pdf = pd.DataFrame(summary_data)
@@ -345,16 +345,15 @@ if st.session_state.get('pdf_generated', False):
     pdf_data = generate_pdf_report(student_info_dict, summary_df_pdf, st.session_state.sems, total_summary_dict)
     st.sidebar.download_button(label="Tải về Báo cáo PDF", data=pdf_data, file_name=f"Bao_cao_hoc_tap_{st.session_state.sv_mssv}.pdf", mime="application/pdf", use_container_width=True)
     st.session_state.pdf_generated = False
-
 with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     def style_warning_html(level):
         if level == 0: return f'<p style="color: green; margin:0;">Không</p>'
         if level == 1: return f'<p style="color: orange; font-weight: bold; margin:0;">Mức {level}</p>'
-        return f'<p style="color: red; font-weight: bold; margin:0;">Mức {level}</p>'
+        if level == 2 or level == 3: return f'<p style="color: red; font-weight: bold; margin:0;">Mức {level}</p>'
+        if level == 4: return f'<p style="color: #A30000; font-weight: bold; margin:0;">Xóa tên</p>'
     display_df = pd.DataFrame(warning_history)
-    display_df["Mức Cảnh báo"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
-    display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Cảnh báo": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
-    st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-
+    display_df["Mức Xử lý"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
+    display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Xử lý": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
+    st.markdown(display_df[["<b>Học kỳ</b>", "<b>Mức Xử lý</b>", "<b>Lý do (gợi ý)</b>"]].to_html(escape=False, index=False), unsafe_allow_html=True)
 with st.expander("❓ Hướng dẫn"):
     st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức cảnh báo chính thức của nhà trường tại mỗi học kỳ để ghi đè lên kết quả tính toán tự động của ứng dụng.""")
