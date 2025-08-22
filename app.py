@@ -61,18 +61,19 @@ def calc_gpa(df: pd.DataFrame, grade_map: Dict[str, float]) -> float:
     if total_credits <= 0: return 0.0
     return (work_passed["QP"].sum()) / total_credits
 
-# NÂNG CẤP: Tích hợp lại logic cảnh báo chi tiết
+# SỬA LỖI: Khôi phục lại hàm cảnh báo chính xác
 def check_academic_warning(semester_number: int, sgpa: float, cumulative_f_credits: float, previous_warning_level: int) -> Tuple[int, str, List[str]]:
     reasons, is_warning_condition_met = [], False
     if semester_number == 1 and sgpa < 0.80: is_warning_condition_met = True; reasons.append(f"SGPA học kỳ 1 ({sgpa:.2f}) < 0.80")
     elif semester_number > 1 and sgpa < 1.00: is_warning_condition_met = True; reasons.append(f"SGPA ({sgpa:.2f}) < 1.00")
-    if cumulative_f_credits > 24: is_warning_condition_met = True; reasons.append(f"Tổng tín chỉ nợ ({cumulative_f_credits}) > 24")
+    if cumulative_f_credits > 24: is_warning_condition_met = True; reasons.append(f"Tổng tín chỉ nợ ({cumulative_f_credits:.1f}) > 24")
     
     current_warning_level = 0
     if is_warning_condition_met:
         if previous_warning_level == 2: current_warning_level = 3
         elif previous_warning_level == 1: current_warning_level = 2
         else: current_warning_level = 1
+    # Nếu không vi phạm, mức cảnh báo sẽ là 0 (đã được reset ở dòng trên)
     
     if current_warning_level > 0: return current_warning_level, f"Cảnh báo học tập Mức {current_warning_level}", reasons
     return 0, "Đạt yêu cầu", []
