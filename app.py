@@ -343,8 +343,6 @@ if st.session_state.get('pdf_generated', False):
     st.sidebar.download_button(label="Tải về Báo cáo PDF", data=pdf_data, file_name=f"Bao_cao_hoc_tap_{st.session_state.sv_mssv}.pdf", mime="application/pdf", use_container_width=True)
     st.session_state.pdf_generated = False
 
-with st.expander("❓ Hướng dẫn"):
-    st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức cảnh báo chính thức của nhà trường tại mỗi học kỳ để ghi đè lên kết quả tính toán tự động của ứng dụng.""")
 with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     def style_warning_html(level):
         if level == 0: return f'<p style="color: green; margin:0;">Không</p>'
@@ -355,3 +353,6 @@ with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     display_df["Mức Cảnh báo"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
     display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Cảnh báo": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
     st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+with st.expander("❓ Hướng dẫn"):
+    st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức cảnh báo chính thức của nhà trường tại mỗi học kỳ để ghi đè lên kết quả tính toán tự động của ứng dụng.""")
