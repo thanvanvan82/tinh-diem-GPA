@@ -3,12 +3,14 @@ import pandas as pd
 from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
+from fpdf import FPDF
 
 st.set_page_config(page_title="Hệ thống Tư vấn Học tập", page_icon="🎓", layout="wide")
 
 # -----------------------------
 # DỮ LIỆU CẤU HÌNH & HẰNG SỐ
 # -----------------------------
+# ... (Phần MAJORS_DATA và PRESET_SCALES giữ nguyên như cũ)
 MAJORS_DATA = {
     "Công nghệ kỹ thuật xây dựng": {
         "course_categories": ["Lý luận chính trị", "Kỹ năng", "Ngoại ngữ", "Khoa học tự nhiên và tin học", "Giáo dục quốc phòng an ninh", "Giáo dục thể chất", "Kiến thức cơ sở khối ngành", "Kiến thức cơ sở ngành", "Kiến thức ngành", "Kiến thức tự chọn", "Thực tập và học phần tốt nghiệp", "Môn học điều kiện", "Chuẩn đầu ra"],
@@ -41,6 +43,51 @@ PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
+# NÂNG CẤP: Class để tạo PDF
+class PDF(FPDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Thêm font hỗ trợ Unicode (cần có file font .ttf trong cùng thư mục)
+        try:
+            self.add_font('Roboto', '', 'Roboto-Regular.ttf', uni=True)
+            self.font_family = 'Roboto'
+        except RuntimeError:
+            st.error("Lỗi: Không tìm thấy file font 'Roboto-Regular.ttf'. Vui lòng đặt file font vào cùng thư mục với app.py.")
+            self.font_family = 'Arial' # Fallback font
+    def header(self):
+        self.set_font(self.font_family, 'B', 16)
+        self.cell(0, 10, 'BÁO CÁO KẾT QUẢ HỌC TẬP', 0, 1, 'C')
+        self.ln(5)
+    def footer(self):
+        self.set_y(-15)
+        self.set_font(self.font_family, 'I', 8)
+        self.cell(0, 10, f'Trang {self.page_no()}/{{nb}}', 0, 0, 'C')
+    def chapter_title(self, title):
+        self.set_font(self.font_family, 'B', 12)
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(2)
+    def student_info(self, info: Dict):
+        self.set_font(self.font_family, '', 11)
+        for key, value in info.items():
+            self.set_font(self.font_family, 'B', 11)
+            self.cell(40, 7, f'{key}:')
+            self.set_font(self.font_family, '', 11)
+            self.cell(0, 7, value)
+            self.ln()
+        self.ln(5)
+    def create_table(self, data: pd.DataFrame, column_widths: Dict = None):
+        self.set_font(self.font_family, 'B', 10)
+        # Header
+        for col, width in zip(data.columns, column_widths):
+            self.cell(width, 8, col, 1, 0, 'C')
+        self.ln()
+        # Data
+        self.set_font(self.font_family, '', 10)
+        for _, row in data.iterrows():
+            for col, width in zip(data.columns, column_widths):
+                text = str(row[col]).replace('**', '') # Xóa markdown
+                self.cell(width, 7, text, 1, 0, 'C' if col != "Học kỳ" else "L")
+            self.ln()
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -93,8 +140,6 @@ def get_preloaded_sems_from_major(major_name):
         sem_df = df[df["Semester"] == i][["Course", "Credits", "Grade", "Category"]].reset_index(drop=True)
         sems.append(sem_df if not sem_df.empty else pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]))
     return sems, int(max_sem)
-
-# NÂNG CẤP: Các hàm xác định Trình độ và Xếp loại
 def get_student_level(credits: float) -> str:
     if credits < 37: return "Năm thứ nhất"
     if 37 <= credits <= 72: return "Năm thứ hai"
@@ -110,12 +155,44 @@ def get_gpa_ranking(gpa: float) -> str:
     if 1.50 <= gpa < 2.00: return "Trung bình yếu"
     if 1.00 <= gpa < 1.50: return "Yếu"
     return "Kém"
+def generate_pdf_report(student_info, summary_df, detailed_dfs, total_summary):
+    pdf = PDF()
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    pdf.student_info(student_info)
+    pdf.chapter_title('Bảng điểm Tổng hợp')
+    pdf.create_table(summary_df, column_widths=[60, 30, 30, 25, 25])
+    pdf.ln(5)
+    
+    pdf.chapter_title('Tổng kết Toàn khóa')
+    pdf.set_font(pdf.font_family, '', 11)
+    for key, value in total_summary.items():
+        pdf.set_font(pdf.font_family, 'B', 11)
+        pdf.cell(50, 7, f'{key}:')
+        pdf.set_font(pdf.font_family, '', 11)
+        pdf.cell(0, 7, str(value))
+        pdf.ln()
+    pdf.ln(5)
+
+    pdf.add_page()
+    pdf.chapter_title('Bảng điểm Chi tiết')
+    for i, df in enumerate(detailed_dfs):
+        if not df.empty:
+            pdf.set_font(pdf.font_family, 'B', 11)
+            pdf.cell(0, 10, f'Học kỳ {i+1}', 0, 1)
+            # Thêm STT
+            df_display = df.copy()
+            df_display.insert(0, 'STT', range(1, len(df_display) + 1))
+            pdf.create_table(df_display[['STT', 'Course', 'Credits', 'Grade', 'Category']], column_widths=[10, 100, 20, 20, 40])
+            pdf.ln(5)
+
+    return pdf.output(dest='S').encode('latin1')
 
 # -----------------------------
 # SIDEBAR
 # -----------------------------
 with st.sidebar:
-    st.title("⚙️ Cài đặt")
+    st.title("⚙️ Cài đặt & Thao tác")
     st.subheader("Thang điểm")
     scale_name = st.selectbox("Chọn thang điểm:", list(PRESET_SCALES.keys()), index=0)
     grade_map = PRESET_SCALES[scale_name]
@@ -132,9 +209,9 @@ with st.sidebar:
     def on_file_upload(): st.session_state.file_processed = False
     upload = st.file_uploader("Nhập file CSV (có cột Semester, Category)", type=["csv"], key="uploader", on_change=on_file_upload)
     st.divider()
-    st.subheader("🖨️ In Bảng điểm")
-    print_button_html = """<style>@media print {[data-testid="stSidebar"], [data-testid="stHeader"], .stButton, [data-testid="stExpander"] {display: none !important;} [data-testid="stAppViewContainer"] {padding-top: 0 !important;}}</style><button onclick="window.print()">🖨️ In ra PDF</button>"""
-    st.markdown(print_button_html, unsafe_allow_html=True)
+    st.subheader("🖨️ In Báo cáo")
+    if st.button("Tạo Báo cáo PDF", use_container_width=True):
+        st.session_state.pdf_generated = True
 
 # -----------------------------
 # GIAO DIỆN CHÍNH
@@ -190,14 +267,14 @@ with tab1:
                 with target_col:
                     delta_text = f"Còn lại: {row['Còn lại']:.0f}"
                     delta_color = "inverse"
-                    if row['Còn lại'] == 0:
-                        delta_text = "✅ Hoàn thành"
-                        delta_color = "off"
+                    if row['Còn lại'] == 0: delta_text = "✅ Hoàn thành"; delta_color = "off"
                     st.metric(label=str(row["Khối kiến thức"]), value=f"{row['Tín chỉ Hoàn thành']:.0f} / {row['Tín chỉ Yêu cầu']:.0f}", delta=delta_text, delta_color=delta_color)
                     st.progress(row['Tiến độ'])
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
     n_sem = st.number_input("Số học kỳ (semesters)", min_value=1, max_value=20, value=st.session_state.get('n_sem_input', 8), step=1, key="n_sem_input")
+    if "manual_warnings" not in st.session_state or len(st.session_state.manual_warnings) != n_sem:
+        st.session_state.manual_warnings = ["Tự động"] * n_sem
     if len(st.session_state.sems) != n_sem:
         current_sems = st.session_state.get("sems", [])
         current_len = len(current_sems)
@@ -222,50 +299,61 @@ with tab1:
             creds = pd.to_numeric(current_sem_df["Credits"], errors="coerce").fillna(0.0).sum(); per_sem_cred.append(float(creds))
             current_f_credits = pd.to_numeric(current_sem_df[current_sem_df["Grade"].isin(fail_grades)]["Credits"], errors="coerce").fillna(0.0).sum()
             cumulative_f_credits += current_f_credits
-            warning_level, msg, reasons = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)
-            warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": warning_level, "Lý do": ", ".join(reasons) if reasons else "Không có"})
+            auto_warning_level, _, _ = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)
+            
+            st.divider()
             m1, m2, m3 = st.columns(3)
             m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}")
             m3.metric("Tín chỉ nợ tích lũy", value=f"{cumulative_f_credits:.2f}", delta=f"{current_f_credits:.2f} TC nợ mới" if current_f_credits > 0 else None)
-            st.divider()
-            if warning_level > 0: st.warning(f"**{msg}**\n\n*Lý do: {' & '.join(reasons)}*")
+            
+            # NÂNG CẤP: Nhập cảnh báo thủ công
+            st.write("##### Tình trạng học vụ")
+            manual_warning_options = ["Tự động", "Không", "Mức 1", "Mức 2", "Mức 3"]
+            selected_warning_str = st.selectbox("Xử lý học vụ (chính thức):", options=manual_warning_options, index=manual_warning_options.index(st.session_state.manual_warnings[i]), key=f"manual_warning_{i}")
+            st.session_state.manual_warnings[i] = selected_warning_str
+
+            if selected_warning_str == "Tự động":
+                final_warning_level = auto_warning_level
+            else:
+                final_warning_level = 0 if selected_warning_str == "Không" else int(selected_warning_str.split(" ")[1])
+            
+            reasons_for_warning = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)[2]
+            msg = f"Cảnh báo học tập Mức {final_warning_level}" if final_warning_level > 0 else "Đạt yêu cầu"
+            if final_warning_level > 0: st.warning(f"**{msg}**" + (f"\n\n*Lý do (gợi ý): {' & '.join(reasons_for_warning)}*" if reasons_for_warning and selected_warning_str == "Tự động" else ""))
             else: st.success(f"**✅ {msg}**")
-            previous_warning_level = warning_level
+            warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": final_warning_level, "Lý do": ", ".join(reasons_for_warning) if reasons_for_warning else "Không có"})
+            previous_warning_level = final_warning_level
+
             with st.expander("🔴 Thao tác Nguy hiểm"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("🗑️ Xóa môn đã chọn", key=f"delete_{i}", use_container_width=True, type="secondary"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("🗑️ Xóa môn đã chọn", key=f"delete_{i}", use_container_width=True):
                         rows_to_keep = [row for _, row in edited.iterrows() if not row["Xóa"]]
                         st.session_state.sems[i] = pd.DataFrame(rows_to_keep).drop(columns=["Xóa"]); st.rerun()
-                with col2:
-                    if st.button("🔄 Reset học kỳ", key=f"confirm_reset_btn_{i}", use_container_width=True, type="secondary"):
-                        st.session_state[f"confirm_reset_{i}"] = True
+                with c2:
+                    if st.button("🔄 Reset học kỳ", key=f"confirm_reset_btn_{i}", use_container_width=True): st.session_state[f"confirm_reset_{i}"] = True
                 if st.session_state.get(f"confirm_reset_{i}", False):
-                    st.warning("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu của học kỳ này không? Hành động này không thể hoàn tác.")
-                    c1, c2 = st.columns(2)
-                    with c1:
+                    st.warning("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu của học kỳ này không?")
+                    cc1, cc2 = st.columns(2)
+                    with cc1:
                         if st.button("⚠️ Vâng, tôi chắc chắn", key=f"reset_yes_{i}", use_container_width=True, type="primary"):
                             st.session_state.sems[i] = pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"])
-                            st.session_state[f"confirm_reset_{i}"] = False
-                            st.rerun()
-                    with c2:
+                            st.session_state[f"confirm_reset_{i}"] = False; st.rerun()
+                    with cc2:
                         if st.button("Hủy bỏ", key=f"reset_no_{i}", use_container_width=True):
-                            st.session_state[f"confirm_reset_{i}"] = False
-                            st.rerun()
+                            st.session_state[f"confirm_reset_{i}"] = False; st.rerun()
     st.divider()
     st.header("Tổng kết Toàn khóa")
     all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
     master_passed_df = pd.concat(all_passed_dfs) if all_passed_dfs else pd.DataFrame()
     cgpa = calc_gpa(master_passed_df, grade_map)
     total_passed_credits = pd.to_numeric(master_passed_df['Credits'], errors='coerce').fillna(0).sum()
-    
     colA, colB = st.columns(2)
     colC, colD = st.columns(2)
     with colA: st.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
     with colB: st.metric("📚 Tổng tín chỉ đã qua", f"{total_passed_credits:.2f}")
     with colC: st.metric("🧑‍🎓 Trình độ sinh viên", get_student_level(total_passed_credits))
     with colD: st.metric("🏆 Xếp loại học lực", get_gpa_ranking(cgpa))
-    
     st.subheader("Xu hướng GPA theo học kỳ")
     if per_sem_gpa and all(c >= 0 for c in per_sem_cred):
         try:
@@ -298,15 +386,37 @@ with tab2:
             summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(cumulative_credits)}**"})
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
 
-with st.expander("❓ Hướng dẫn, Cách tính & Lịch sử cảnh báo"):
-    st.markdown("##### Hướng dẫn sử dụng")
+# NÂNG CẤP: Hiển thị PDF download button
+if st.session_state.get('pdf_generated', False):
+    student_info_dict = {"Họ và tên": st.session_state.sv_hoten, "Mã SV": st.session_state.sv_mssv, "Lớp": st.session_state.sv_lop, "Ngành học": selected_major}
+    summary_df_pdf = pd.DataFrame(summary_data)
+    total_summary_dict = {"GPA Tích lũy (CGPA)": f"{cgpa:.3f}", "Tổng tín chỉ đã qua": f"{total_passed_credits:.2f}", "Trình độ sinh viên": get_student_level(total_passed_credits), "Xếp loại học lực": get_gpa_ranking(cgpa)}
+    
+    pdf_data = generate_pdf_report(student_info_dict, summary_df_pdf, st.session_state.sems, total_summary_dict)
+    
+    st.sidebar.download_button(
+        label="Tải về Báo cáo PDF",
+        data=pdf_data,
+        file_name=f"Bao_cao_hoc_tap_{st.session_state.sv_mssv}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+    # Reset cờ để nút download biến mất sau khi tải
+    st.session_state.pdf_generated = False
+
+with st.expander("❓ Hướng dẫn"):
     st.markdown("""
 - **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.
 - **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.
+- **Xử lý học vụ:** Chọn mức cảnh báo chính thức của nhà trường tại mỗi học kỳ để ghi đè lên kết quả tính toán tự động của ứng dụng.
 """)
-    st.markdown("---")
-    st.markdown("##### Lịch sử cảnh báo học tập")
-    # NÂNG CẤP: Hiển thị "Không" thay vì 0
-    warning_display_df = pd.DataFrame(warning_history)
-    warning_display_df["Mức Cảnh báo"] = warning_display_df["Mức Cảnh báo"].apply(lambda x: "Không" if x == 0 else f"Mức {x}")
-    st.dataframe(warning_display_df, use_container_width=True, hide_index=True)
+with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
+    def style_warning_html(level):
+        if level == 0: return f'<span style="color: green;">Không</span>'
+        if level == 1: return f'<span style="color: orange; font-weight: bold;">Mức {level}</span>'
+        return f'<span style="color: red; font-weight: bold;">Mức {level}</span>'
+
+    display_df = pd.DataFrame(warning_history)
+    display_df["Mức Cảnh báo"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
+    display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Cảnh báo": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
+    st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
