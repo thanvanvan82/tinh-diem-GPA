@@ -230,4 +230,52 @@ for i, tab in enumerate(sem_tabs):
 
         m1, m2, m3 = st.columns(3)
         m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}")
-        m2
+        m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}")
+        m3.metric("Tín chỉ nợ tích lũy", f"{cumulative_f_credits:.2f}")
+        
+        st.divider()
+        if warning_level > 0: st.warning(f"**{warning_message}**\n\n*Lý do: {' & '.join(reasons)}*")
+        else: st.success(f"**✅ {warning_message}**")
+        previous_warning_level = warning_level
+
+# --- PHẦN TỔNG KẾT ---
+all_cred = sum(per_sem_cred)
+# Sửa cách tính CGPA để chỉ tính trên các môn qua
+all_passed_dfs = []
+for df in st.session_state.sems:
+    all_passed_dfs.append(df[~df["Grade"].isin(fail_grades)])
+if all_passed_dfs:
+    master_passed_df = pd.concat(all_passed_dfs)
+    cgpa = calc_gpa(master_passed_df, grade_map)
+else:
+    cgpa = 0.0
+
+st.divider()
+colA, colB, colC = st.columns([1, 1, 2])
+colA.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
+colB.metric("📚 Tổng tín chỉ đã qua", f"{all_cred - cumulative_f_credits:.2f}")
+
+with colC:
+    if per_sem_gpa and all(c >= 0 for c in per_sem_cred):
+        try:
+            fig, ax = plt.subplots(); x = np.arange(1, len(per_sem_gpa) + 1)
+            ax.plot(x, per_sem_gpa, marker="o", linestyle="-", color='b')
+            ax.set_xlabel("Học kỳ"); ax.set_ylabel("GPA (SGPA)"); ax.set_title("Xu hướng GPA theo học kỳ")
+            ax.set_xticks(x); ax.grid(True, linestyle=":", linewidth=0.5)
+            ax.set_ylim(bottom=0, top=max(4.1, max(per_sem_gpa) * 1.1 if per_sem_gpa and any(v > 0 for v in per_sem_gpa) else 4.1))
+            st.pyplot(fig, use_container_width=True)
+        except Exception: st.info("Chưa đủ dữ liệu để vẽ biểu đồ.")
+
+with st.expander("❓ Hướng dẫn, Cách tính & Lịch sử cảnh báo"):
+    st.markdown("##### Hướng dẫn sử dụng")
+    st.markdown("""
+- **Nhập/Xuất file:**
+    - **Nhập:** Dùng nút "Nhập file CSV" ở thanh bên. File phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.
+    - **Xuất:** Dùng nút "Xuất toàn bộ dữ liệu (CSV)" để lưu lại.
+- **Cách thêm/xóa môn học:**
+    - **Thêm:** Nhấn vào nút `+` ở góc dưới cùng bên trái của bảng điểm.
+    - **Xóa:** Tick vào ô "Xóa" ở đầu hàng, sau đó nhấn nút "🗑️ Xóa môn đã chọn".
+""")
+    st.markdown("---")
+    st.markdown("##### Lịch sử cảnh báo học tập")
+    st.dataframe(pd.DataFrame(warning_history), use_container_width=True, hide_index=True)
