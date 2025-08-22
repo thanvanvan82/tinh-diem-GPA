@@ -19,8 +19,8 @@ PRESET_SCALES: Dict[str, Dict[str, float]] = {
         "O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "P": 4, "F": 0,
     },
     "Simple 10-point": {str(k): float(k) for k in range(10, -1, -1)},
-    "VN 4.0 (tham khảo)": {  # Tham khảo phổ biến ở VN (có thể chỉnh lại ở Custom)
-        "A": 4.0, "B+": 3.5, "B": 3.0, "C+": 2.5, "C": 2.0, "D+": 1.5, "D": 1.0, "F": 0.0,
+    "VN 4.0 (TLU)": {  # Theo QUYẾT ĐỊNH số 1226 /QĐ-ĐHTL ngày  13  tháng  9  năm 2021 về ban hành Quy chế đào tạo trình độ đại học của Trường Đại học Thủy lợi (có thể chỉnh lại ở Custom)
+        "A": 4.0, "B": 3.0, "C": 2.0, "D": 1.0, "F": 0.0,
     },
 }
 
