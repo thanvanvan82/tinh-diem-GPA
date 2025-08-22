@@ -41,7 +41,6 @@ PRESET_SCALES: Dict[str, Dict[str, float]] = {"VN 4.0 (TLU)": {"A": 4.0, "B": 3.
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
-# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
@@ -95,6 +94,23 @@ def get_preloaded_sems_from_major(major_name):
         sems.append(sem_df if not sem_df.empty else pd.DataFrame(columns=["Course", "Credits", "Grade", "Category"]))
     return sems, int(max_sem)
 
+# NÂNG CẤP: Các hàm xác định Trình độ và Xếp loại
+def get_student_level(credits: float) -> str:
+    if credits < 37: return "Năm thứ nhất"
+    if 37 <= credits <= 72: return "Năm thứ hai"
+    if 73 <= credits <= 108: return "Năm thứ ba"
+    if 109 <= credits <= 142: return "Năm thứ tư"
+    return "Năm thứ năm"
+def get_gpa_ranking(gpa: float) -> str:
+    if gpa >= 3.60: return "Xuất sắc"
+    if 3.20 <= gpa < 3.60: return "Giỏi"
+    if 2.50 <= gpa < 3.20: return "Khá"
+    if 2.30 <= gpa < 2.50: return "Trung bình khá"
+    if 2.00 <= gpa < 2.30: return "Trung bình"
+    if 1.50 <= gpa < 2.00: return "Trung bình yếu"
+    if 1.00 <= gpa < 1.50: return "Yếu"
+    return "Kém"
+
 # -----------------------------
 # SIDEBAR
 # -----------------------------
@@ -139,7 +155,6 @@ with st.container(border=True):
         selected_major = st.selectbox("Ngành học:", options=list(MAJORS_DATA.keys()), key="major_selector", on_change=on_major_change)
 st.divider()
 if "sems" not in st.session_state: on_major_change()
-
 GRADUATION_REQUIREMENTS_CURRENT = MAJORS_DATA[selected_major]['graduation_requirements']
 DEFAULT_COURSE_CATEGORIES_CURRENT = MAJORS_DATA[selected_major]['course_categories']
 if upload is not None and not st.session_state.get('file_processed', False):
@@ -173,7 +188,12 @@ with tab1:
             for i, row in detail_df.iterrows():
                 target_col = left_col if i % 2 == 0 else right_col
                 with target_col:
-                    st.metric(label=str(row["Khối kiến thức"]), value=f"{row['Tín chỉ Hoàn thành']:.0f} / {row['Tín chỉ Yêu cầu']:.0f}", delta=f"Còn lại: {row['Còn lại']:.0f}", delta_color="inverse")
+                    delta_text = f"Còn lại: {row['Còn lại']:.0f}"
+                    delta_color = "inverse"
+                    if row['Còn lại'] == 0:
+                        delta_text = "✅ Hoàn thành"
+                        delta_color = "off"
+                    st.metric(label=str(row["Khối kiến thức"]), value=f"{row['Tín chỉ Hoàn thành']:.0f} / {row['Tín chỉ Yêu cầu']:.0f}", delta=delta_text, delta_color=delta_color)
                     st.progress(row['Tiến độ'])
     else: st.info("Chưa có dữ liệu để phân tích tiến độ.")
     st.divider()
@@ -205,12 +225,12 @@ with tab1:
             warning_level, msg, reasons = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)
             warning_history.append({"Học kỳ": i + 1, "Mức Cảnh báo": warning_level, "Lý do": ", ".join(reasons) if reasons else "Không có"})
             m1, m2, m3 = st.columns(3)
-            m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}"); m3.metric("Tín chỉ nợ tích lũy", f"{cumulative_f_credits:.2f}")
+            m1.metric("GPA học kỳ (SGPA)", f"{gpa:.3f}"); m2.metric("Tổng tín chỉ học kỳ", f"{creds:.2f}")
+            m3.metric("Tín chỉ nợ tích lũy", value=f"{cumulative_f_credits:.2f}", delta=f"{current_f_credits:.2f} TC nợ mới" if current_f_credits > 0 else None)
             st.divider()
             if warning_level > 0: st.warning(f"**{msg}**\n\n*Lý do: {' & '.join(reasons)}*")
             else: st.success(f"**✅ {msg}**")
             previous_warning_level = warning_level
-            # NÂNG CẤP: Khu vực nguy hiểm
             with st.expander("🔴 Thao tác Nguy hiểm"):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -232,26 +252,30 @@ with tab1:
                         if st.button("Hủy bỏ", key=f"reset_no_{i}", use_container_width=True):
                             st.session_state[f"confirm_reset_{i}"] = False
                             st.rerun()
-
     st.divider()
     st.header("Tổng kết Toàn khóa")
     all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
     master_passed_df = pd.concat(all_passed_dfs) if all_passed_dfs else pd.DataFrame()
     cgpa = calc_gpa(master_passed_df, grade_map)
     total_passed_credits = pd.to_numeric(master_passed_df['Credits'], errors='coerce').fillna(0).sum()
-    colA, colB, colC = st.columns([1, 1, 2])
-    colA.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
-    colB.metric("📚 Tổng tín chỉ đã qua", f"{total_passed_credits:.2f}")
-    with colC:
-        if per_sem_gpa and all(c >= 0 for c in per_sem_cred):
-            try:
-                fig, ax = plt.subplots(); x = np.arange(1, len(per_sem_gpa) + 1)
-                ax.plot(x, per_sem_gpa, marker="o", linestyle="-", color='b')
-                ax.set_xlabel("Học kỳ"); ax.set_ylabel("GPA (SGPA)"); ax.set_title("Xu hướng GPA theo học kỳ")
-                ax.set_xticks(x); ax.grid(True, linestyle=":", linewidth=0.5)
-                ax.set_ylim(bottom=0, top=max(4.1, max(per_sem_gpa) * 1.1 if per_sem_gpa and any(v > 0 for v in per_sem_gpa) else 4.1))
-                st.pyplot(fig, use_container_width=True)
-            except Exception: st.info("Chưa đủ dữ liệu để vẽ biểu đồ.")
+    
+    colA, colB = st.columns(2)
+    colC, colD = st.columns(2)
+    with colA: st.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
+    with colB: st.metric("📚 Tổng tín chỉ đã qua", f"{total_passed_credits:.2f}")
+    with colC: st.metric("🧑‍🎓 Trình độ sinh viên", get_student_level(total_passed_credits))
+    with colD: st.metric("🏆 Xếp loại học lực", get_gpa_ranking(cgpa))
+    
+    st.subheader("Xu hướng GPA theo học kỳ")
+    if per_sem_gpa and all(c >= 0 for c in per_sem_cred):
+        try:
+            fig, ax = plt.subplots(); x = np.arange(1, len(per_sem_gpa) + 1)
+            ax.plot(x, per_sem_gpa, marker="o", linestyle="-", color='b')
+            ax.set_xlabel("Học kỳ"); ax.set_ylabel("GPA (SGPA)"); ax.set_title("Biểu đồ GPA các học kỳ")
+            ax.set_xticks(x); ax.grid(True, linestyle=":", linewidth=0.5)
+            ax.set_ylim(bottom=0, top=max(4.1, max(per_sem_gpa) * 1.1 if per_sem_gpa and any(v > 0 for v in per_sem_gpa) else 4.1))
+            st.pyplot(fig, use_container_width=True)
+        except Exception: st.info("Chưa đủ dữ liệu để vẽ biểu đồ.")
 
 with tab2:
     st.header("Bảng điểm Tổng hợp theo Học kỳ và Năm học")
@@ -273,3 +297,16 @@ with tab2:
             year_str = f"Năm {year_text}"
             summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(cumulative_credits)}**"})
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
+
+with st.expander("❓ Hướng dẫn, Cách tính & Lịch sử cảnh báo"):
+    st.markdown("##### Hướng dẫn sử dụng")
+    st.markdown("""
+- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.
+- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.
+""")
+    st.markdown("---")
+    st.markdown("##### Lịch sử cảnh báo học tập")
+    # NÂNG CẤP: Hiển thị "Không" thay vì 0
+    warning_display_df = pd.DataFrame(warning_history)
+    warning_display_df["Mức Cảnh báo"] = warning_display_df["Mức Cảnh báo"].apply(lambda x: "Không" if x == 0 else f"Mức {x}")
+    st.dataframe(warning_display_df, use_container_width=True, hide_index=True)
