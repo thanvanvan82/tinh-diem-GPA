@@ -171,4 +171,45 @@ all_cred = 0.0
 for df in st.session_state.sems:
     work = df.copy()
     work["Points"] = work["Grade"].map(grade_map).fillna(0.0)
-    work["QP"
+    work["QP"] = work["Points"] * pd.to_numeric(work["Credits"], errors="coerce").fillna(0.0)
+    all_qp += work["QP"].sum()
+    all_cred += pd.to_numeric(work["Credits"], errors="coerce").fillna(0.0).sum()
+
+cgpa = (all_qp / all_cred) if all_cred > 0 else 0.0
+st.divider()
+colA, colB, colC = st.columns([1, 1, 2])
+colA.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
+colB.metric("📚 Tổng tín chỉ tích lũy", f"{all_cred:.2f}")
+
+# Trend chart
+with colC:
+    if all(c > 0 for c in per_sem_cred): # Chỉ vẽ biểu đồ khi có dữ liệu tín chỉ
+        try:
+            fig, ax = plt.subplots()
+            x = np.arange(1, len(per_sem_gpa) + 1)
+            ax.plot(x, per_sem_gpa, marker="o", linestyle="-", color='b')
+            ax.set_xlabel("Học kỳ")
+            ax.set_ylabel("GPA (SGPA)")
+            ax.set_title("Xu hướng GPA theo học kỳ")
+            ax.set_xticks(x) # Đảm bảo các tick trên trục x là số nguyên
+            ax.grid(True, linestyle=":", linewidth=0.5)
+            ax.set_ylim(bottom=0, top=max(4.1, max(per_sem_gpa) * 1.1 if per_sem_gpa else 4.1)) # Giới hạn trục y
+            st.pyplot(fig, use_container_width=True)
+        except Exception:
+            st.info("Chưa đủ dữ liệu để vẽ biểu đồ.")
+
+# Legend for scale
+with st.expander("📏 Xem bảng quy đổi điểm đang sử dụng"):
+    st.dataframe(pd.DataFrame({"Điểm chữ (Grade)": list(grade_map.keys()), "Điểm số (Point)": list(grade_map.values())}), hide_index=True)
+
+with st.expander("❓ Hướng dẫn & Cách tính"):
+    st.markdown(
+        """
+        - **Cách thêm/xóa môn học:**
+            - **Thêm:** Nhấn vào nút `+` ở góc dưới cùng bên trái của bảng điểm.
+            - **Xóa:** Chọn một hoặc nhiều hàng bằng cách click vào ô checkbox bên trái, sau đó nhấn phím `Delete` trên bàn phím.
+        - **SGPA (Semester GPA)** = Tổng ( *Điểm số* × *Số tín chỉ* ) / Tổng *Số tín chỉ* của học kỳ đó.
+        - **CGPA (Cumulative GPA)** = Tổng tất cả *Quality Points* / Tổng tất cả *Số tín chỉ* qua các học kỳ.
+        - Bạn có thể **tùy chỉnh thang điểm** hoặc **Nhập/Xuất file CSV** ở thanh Cài đặt bên trái.
+        """
+    )
