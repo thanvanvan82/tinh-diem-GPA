@@ -51,14 +51,13 @@ WARNING_STR_TO_LEVEL = {"Không": 0, "Mức 1": 1, "Mức 2": 2, "Mức 3": 3, "
 # -----------------------------
 # CÁC HÀM TIỆN ÍCH
 # -----------------------------
+# ... (Các hàm calc_gpa, check_academic_warning, v.v. giữ nguyên và thêm hàm PDF)
 @st.cache_data
 def to_csv(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
-
 def calc_gpa(df: pd.DataFrame, grade_map: Dict[str, float]) -> float:
     if df.empty: return 0.0
     work = df.copy()
-    # NÂNG CẤP: Lọc bỏ các môn không tính điểm trước khi tính toán
     work = work[~work["Category"].isin(EXCLUDED_CATEGORIES)]
     fail_grades = [grade for grade, point in grade_map.items() if point == 0.0]
     work_passed = work[~work["Grade"].isin(fail_grades)]
@@ -68,7 +67,6 @@ def calc_gpa(df: pd.DataFrame, grade_map: Dict[str, float]) -> float:
     total_credits = pd.to_numeric(work_passed["Credits"], errors="coerce").fillna(0.0).sum()
     if total_credits <= 0: return 0.0
     return (work_passed["QP"].sum()) / total_credits
-
 def check_academic_warning(semester_number: int, sgpa: float, cumulative_f_credits: float, previous_warning_level: int) -> Tuple[int, str, List[str]]:
     reasons, is_warning_condition_met = [], False
     if semester_number == 1 and sgpa < 0.80: is_warning_condition_met = True; reasons.append(f"SGPA học kỳ 1 ({sgpa:.2f}) < 0.80")
@@ -77,14 +75,13 @@ def check_academic_warning(semester_number: int, sgpa: float, cumulative_f_credi
     
     current_warning_level = 0
     if is_warning_condition_met:
-        if previous_warning_level == 3: current_warning_level = 1
+        if previous_warning_level == 3: current_warning_level = 1 
         elif previous_warning_level == 2: current_warning_level = 3
         elif previous_warning_level == 1: current_warning_level = 2
         else: current_warning_level = 1
     
     if current_warning_level > 0: return current_warning_level, f"Cảnh báo học tập Mức {current_warning_level}", reasons
     return 0, "Đạt yêu cầu", []
-
 def calculate_progress(all_sems_data: List[pd.DataFrame], requirements: Dict, grade_map: Dict):
     if not any(not df.empty for df in all_sems_data): return pd.DataFrame()
     master_df = pd.concat(all_sems_data, ignore_index=True)
@@ -141,7 +138,6 @@ def get_courses_for_improvement(all_sems_data, grade_map):
     best_grades_df = master_df.loc[master_df.groupby('Course')['Points'].idxmax()]
     d_grade = 'D'
     improve_df = best_grades_df[best_grades_df['Grade'] == d_grade]
-    # NÂNG CẤP: Lọc bỏ các môn không nên học cải thiện
     improve_df = improve_df[~improve_df["Category"].isin(EXCLUDED_CATEGORIES)]
     return improve_df[['Course', 'Credits', 'Grade', 'Category']].reset_index(drop=True)
 class PDF(FPDF):
@@ -291,7 +287,7 @@ with tab1:
             current_sem_df = st.session_state.sems[i]
             gpa = calc_gpa(current_sem_df, grade_map); per_sem_gpa.append(gpa)
             creds = pd.to_numeric(current_sem_df["Credits"], errors="coerce").fillna(0.0).sum(); per_sem_cred.append(float(creds))
-            current_f_credits = pd.to_numeric(current_sem_df[current_sem_df["Grade"].isin(fail_grades)]["Credits"], errors="coerce").fillna(0.0).sum()
+            current_f_credits = pd.to_numeric(current_sem_df[current_sem_df["Grade"].isin(fail_grades) & ~current_sem_df["Category"].isin(EXCLUDED_CATEGORIES)]["Credits"], errors="coerce").fillna(0.0).sum()
             cumulative_f_credits += current_f_credits
             auto_warning_level, _, auto_reasons = check_academic_warning(i + 1, gpa, cumulative_f_credits, previous_warning_level)
             st.divider()
@@ -333,18 +329,15 @@ with tab1:
     st.header("Tổng kết Toàn khóa")
     all_passed_dfs = [df[~df["Grade"].isin(fail_grades)] for df in st.session_state.sems]
     master_passed_df = pd.concat(all_passed_dfs) if all_passed_dfs else pd.DataFrame()
-    
-    # NÂNG CẤP: Tính toán CGPA và tín chỉ dựa trên các môn tính điểm
     gpa_relevant_passed_df = master_passed_df[~master_passed_df["Category"].isin(EXCLUDED_CATEGORIES)]
     cgpa = calc_gpa(gpa_relevant_passed_df, grade_map)
     total_gpa_credits = pd.to_numeric(gpa_relevant_passed_df['Credits'], errors='coerce').fillna(0).sum()
-
+    total_passed_credits_for_level = pd.to_numeric(master_passed_df['Credits'], errors='coerce').fillna(0).sum()
     colA, colB = st.columns(2); colC, colD = st.columns(2)
     with colA: st.metric("🎯 GPA Tích lũy (CGPA)", f"{cgpa:.3f}")
     with colB: st.metric("📚 Tổng tín chỉ tính GPA", f"{total_gpa_credits:.2f}")
-    with colC: st.metric("🧑‍🎓 Trình độ sinh viên", get_student_level(total_passed_credits))
+    with colC: st.metric("🧑‍🎓 Trình độ sinh viên", get_student_level(total_passed_credits_for_level))
     with colD: st.metric("🏆 Xếp loại học lực", get_gpa_ranking(cgpa))
-    
     st.subheader("💡 Gợi ý học tập")
     g1, g2 = st.columns(2)
     with g1:
@@ -374,40 +367,38 @@ with tab1:
 
 with tab2:
     st.header("Bảng điểm Tổng hợp theo Học kỳ và Năm học")
-    summary_data, cumulative_credits, cumulative_qp = [], 0.0, 0.0
+    summary_data, cumulative_credits_gpa, cumulative_qp = [], 0.0, 0.0
+    cumulative_credits_total = 0.0
     year_map = {1: "thứ nhất", 2: "thứ hai", 3: "thứ ba", 4: "thứ tư", 5: "thứ năm"}
     for i in range(len(st.session_state.sems)):
         sem_df = st.session_state.sems[i]
         sem_gpa = per_sem_gpa[i]
         passed_df = sem_df[~sem_df['Grade'].isin(fail_grades)]
         passed_credits = pd.to_numeric(passed_df['Credits'], errors='coerce').fillna(0).sum()
-        
-        # Tính QP và GPA tích lũy chỉ dựa trên các môn tính điểm
+        cumulative_credits_total += passed_credits
         gpa_relevant_passed_df_sem = passed_df[~passed_df["Category"].isin(EXCLUDED_CATEGORIES)]
         sem_qp_for_cgpa = calc_gpa(gpa_relevant_passed_df_sem, grade_map) * pd.to_numeric(gpa_relevant_passed_df_sem['Credits'], errors='coerce').fillna(0).sum()
-        
-        cumulative_credits += pd.to_numeric(gpa_relevant_passed_df_sem['Credits'], errors='coerce').fillna(0).sum()
+        cumulative_credits_gpa += pd.to_numeric(gpa_relevant_passed_df_sem['Credits'], errors='coerce').fillna(0).sum()
         cumulative_qp += sem_qp_for_cgpa
-        cumulative_gpa = (cumulative_qp / cumulative_credits) if cumulative_credits > 0 else 0.0
-        
-        summary_data.append({"Học kỳ": f"Học kỳ {i + 1}", "TBC Hệ 4 (SGPA)": f"{sem_gpa:.2f}", "TBTL Hệ 4 (CGPA)": f"{cumulative_gpa:.2f}", "Số TC Đạt": int(passed_credits), "Số TCTL Đạt": int(pd.to_numeric(pd.concat(st.session_state.sems[:i+1])[~pd.concat(st.session_state.sems[:i+1])['Grade'].isin(fail_grades)]['Credits']).sum())})
-        
+        cumulative_gpa = (cumulative_qp / cumulative_credits_gpa) if cumulative_credits_gpa > 0 else 0.0
+        summary_data.append({"Học kỳ": f"Học kỳ {i + 1}", "TBC Hệ 4 (SGPA)": f"{sem_gpa:.2f}", "TBTL Hệ 4 (CGPA)": f"{cumulative_gpa:.2f}", "Số TC Đạt": int(passed_credits), "Số TCTL Đạt": int(cumulative_credits_total)})
         if (i + 1) % 2 == 0:
             year_number = (i // 2) + 1; year_text = year_map.get(year_number, f"thứ {year_number}"); year_str = f"Năm {year_text}"
-            summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(per_sem_cred[i] + per_sem_cred[i-1])}**", "Số TCTL Đạt": f"**{int(pd.to_numeric(pd.concat(st.session_state.sems[:i+1])[~pd.concat(st.session_state.sems[:i+1])['Grade'].isin(fail_grades)]['Credits']).sum())}**"})
-    
+            sem1_credits = per_sem_cred[i-1] if i > 0 else 0
+            sem2_credits = per_sem_cred[i]
+            year_total_credits = sem1_credits + sem2_credits
+            summary_data.append({"Học kỳ": f"**{year_str}**", "TBC Hệ 4 (SGPA)": "", "TBTL Hệ 4 (CGPA)": f"**{cumulative_gpa:.2f}**", "Số TC Đạt": f"**{int(year_total_credits)}**", "Số TCTL Đạt": f"**{int(cumulative_credits_total)}**"})
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
 if st.session_state.get('pdf_generated', False):
     student_info_dict = {"Họ và tên": st.session_state.sv_hoten, "Mã SV": st.session_state.sv_mssv, "Lớp": st.session_state.sv_lop, "Ngành học": selected_major}
     summary_df_pdf = pd.DataFrame(summary_data)
-    total_summary_dict = {"GPA Tích lũy (CGPA)": f"{cgpa:.3f}", "Tổng tín chỉ tính GPA": f"{total_gpa_credits:.2f}", "Trình độ sinh viên": get_student_level(total_gpa_credits), "Xếp loại học lực": get_gpa_ranking(cgpa)}
+    total_summary_dict = {"GPA Tích lũy (CGPA)": f"{cgpa:.3f}", "Tổng tín chỉ tính GPA": f"{total_gpa_credits:.2f}", "Trình độ sinh viên": get_student_level(total_passed_credits_for_level), "Xếp loại học lực": get_gpa_ranking(cgpa)}
     pdf_data = generate_pdf_report(student_info_dict, summary_df_pdf, st.session_state.sems, total_summary_dict)
     st.sidebar.download_button(label="Tải về Báo cáo PDF", data=pdf_data, file_name=f"Bao_cao_hoc_tap_{st.session_state.sv_mssv}.pdf", mime="application/pdf", use_container_width=True)
     st.session_state.pdf_generated = False
 with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     st.markdown("##### Ghi chú")
     st.info("Điểm các môn thuộc khối kiến thức **Giáo dục thể chất** và **Giáo dục quốc phòng an ninh** không được tính vào điểm trung bình chung (GPA/CGPA) và tổng số tín chỉ tích lũy để xét trình độ/xếp loại.")
-    
     def style_warning_html(level):
         if level == 0: return f'<p style="color: green; margin:0;">Không</p>'
         if level == 1: return f'<p style="color: orange; font-weight: bold; margin:0;">Mức {level}</p>'
@@ -417,5 +408,21 @@ with st.expander("📜 Cách tính & Lịch sử xử lý học vụ"):
     display_df["Mức Xử lý"] = display_df["Mức Cảnh báo"].apply(style_warning_html)
     display_df = display_df.rename(columns={"Học kỳ": "<b>Học kỳ</b>", "Mức Xử lý": "<b>Mức Xử lý</b>", "Lý do": "<b>Lý do (gợi ý)</b>"})
     st.markdown(display_df[["<b>Học kỳ</b>", "<b>Mức Xử lý</b>", "<b>Lý do (gợi ý)</b>"]].to_html(escape=False, index=False), unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("##### Căn cứ theo Quy chế đào tạo")
+    st.info("""
+    *Trích QUYẾT ĐỊNH Số 1226 /QĐ-ĐHTL ngày 13 tháng 9 năm 2021 của Trường Đại học Thủy lợi*
+    **Điều 11. Xử lý kết quả học tập theo tín chỉ**
+    **1. Điều kiện cảnh báo:**
+    - Điểm trung bình chung học kỳ đạt dưới **0,80** đối với học kỳ đầu, dưới **1,00** đối với các học kỳ tiếp theo.
+    - Tổng số tín chỉ của các học phần bị điểm F còn tồn đọng tính từ đầu khóa học vượt quá **24 tín chỉ**.
+    **2. Các mức cảnh báo:**
+    - **Mức 1:** Lần đầu tiên vi phạm điều kiện cảnh báo.
+    - **Mức 2:** Vi phạm và đã bị cảnh báo Mức 1 ở học kỳ trước liền kề.
+    - **Mức 3:** Vi phạm và đã bị cảnh báo Mức 2 ở học kỳ trước liền kề.
+    - *Sinh viên sẽ được **xóa cảnh báo** nếu kết quả học tập ở học kỳ liền sau không vi phạm điều kiện.*
+    **3. Xử lý buộc thôi học:**
+    - Nhận cảnh báo kết quả học tập ở **Mức 3**.
+    """)
 with st.expander("❓ Hướng dẫn"):
     st.markdown("""- **Nhập/Xuất file:** File CSV phải có các cột: `Course`, `Credits`, `Grade`, `Semester`, `Category`.\n- **Thêm/xóa môn học:** Dùng nút `+` để thêm và tick vào ô "Xóa" rồi nhấn nút "🗑️ Xóa môn đã chọn" để xóa.\n- **Xử lý học vụ:** Chọn mức xử lý chính thức của nhà trường tại mỗi học kỳ. Kết quả này sẽ được dùng để tính toán mức cảnh báo dự kiến cho học kỳ tiếp theo.""")
